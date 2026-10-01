@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AM-Ai Coordi</title>
+<!-- Outlook 추가 기능 중계 페이지 (2026-10-01)
+     하는 일: Outlook 에서 지금 열린 메일의 제목·본문·보낸사람을 읽어, 각자 PC 에서 켜져 있는
+     AM-Ai Coordi 앱(http://127.0.0.1:5174)에 넘긴다. 이 페이지에는 데이터가 없고, 메일 내용은
+     이 PC 밖으로 나가지 않는다(브라우저 안에서 PC 앱으로만 전달). -->
+<script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+<style>
+  html,body{margin:0;height:100%;font-family:"Segoe UI","Malgun Gothic",sans-serif;font-size:13px;color:#1b2433;background:#fff}
+  #app{border:0;width:100%;height:100%;display:block}
+  #msg{position:absolute;inset:0;display:none;padding:18px;background:#fff;line-height:1.6}
+  #msg b{color:#c2410c}
+  #msg .btns{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+  #msg button{border:1px solid #c9d3e3;background:#fff;border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit}
+  #msg button.main{background:#1f5fae;border-color:#1f5fae;color:#fff;font-weight:700}
+  #msg small{color:#6b7686;display:block;margin-top:10px}
+</style>
+</head>
+<body>
+<div id="msg">
+  <b>AM-Ai Coordi 앱에 연결하지 못했습니다.</b><br>
+  PC 에서 AM-Ai Coordi 가 켜져 있는지 확인해 주세요. (바탕화면 아이콘으로 실행)
+  <div class="btns">
+    <button class="main" id="retry">다시 연결</button>
+    <button id="openApp">앱에서 열기</button>
+  </div>
+  <small>앱이 켜져 있는데도 안 되면, 브라우저가 "로컬 네트워크 접근" 허용을 물을 때 <b>허용</b>을 눌러 주세요.</small>
+</div>
+<iframe id="app" title="AM-Ai Coordi" allow="local-network-access; clipboard-write"></iframe>
+<script>
+(function(){
+  // 포트: 배포 앱 5174 (시험용은 ?port=5175)
+  var port = (new URLSearchParams(location.search).get('port') || '5174').replace(/\D/g,'') || '5174';
+  var APP = 'http://127.0.0.1:' + port;
+  var frame = document.getElementById('app'), msg = document.getElementById('msg');
+  var ready = false, pending = null, timer = null;
+
+  function send(m){
+    try{ frame.contentWindow.postMessage(Object.assign({type:'amai-mail'}, m), APP); }catch(e){}
+  }
+  function connect(){
+    ready = false; msg.style.display = 'none';
+    frame.src = APP + '/?owa=1&t=' + Date.now();
+    clearTimeout(timer);
+    timer = setTimeout(function(){ if(!ready) msg.style.display = 'block'; }, 8000);
+  }
+  window.addEventListener('message', function(e){
+    if(e.source !== frame.contentWindow || !e.data || e.data.type !== 'amai-ready') return;
+    ready = true; msg.style.display = 'none'; clearTimeout(timer);
+    if(pending) send(pending);
+  });
+  document.getElementById('retry').onclick = connect;
+  document.getElementById('openApp').onclick = function(){ window.open(APP + '/', '_blank'); };
+
+  // 지금 열린 메일 → 앱으로
+  function readItem(){
+    var it = Office.context.mailbox && Office.context.mailbox.item;
+    if(!it) return;
+    it.body.getAsync(Office.CoercionType.Text, function(r){
+      var from = it.from || it.sender || {};
+      pending = {
+        subject: it.subject || '',
+        body: String((r && r.value) || '').slice(0, 20000),
+        sender: from.displayName || '',
+        sender_email: from.emailAddress || ''
+      };
+      if(ready) send(pending);
+    });
+  }
+  connect();
+  Office.onReady(function(){
+    readItem();
+    // 패널을 고정(핀)해 두면 다른 메일을 열 때마다 자동으로 바뀐다
+    try{ Office.context.mailbox.addHandlerAsync(Office.EventType.ItemChanged, readItem); }catch(e){}
+  });
+})();
+</script>
+</body>
+</html>
