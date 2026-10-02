@@ -49,10 +49,34 @@
     timer = setTimeout(function(){ if(!ready) msg.style.display = 'block'; }, 8000);
   }
   window.addEventListener('message', function(e){
-    if(e.source !== frame.contentWindow || !e.data || e.data.type !== 'amai-ready') return;
-    ready = true; msg.style.display = 'none'; clearTimeout(timer);
-    if(pending) send(pending);
+    if(e.source !== frame.contentWindow || !e.data) return;
+    if(e.data.type === 'amai-ready'){
+      ready = true; msg.style.display = 'none'; clearTimeout(timer);
+      if(pending) send(pending);
+    }
+    if(e.data.type === 'amai-pop') openDialog(e.data);
   });
+
+  // 큰 창(수주 이력·선주사 창·통합검색 …) = Office 대화상자 — 크롬 탭에 붙지 않는 독립 창, 화면 가운데 (2026-10-02)
+  var dlg = null;
+  function openDialog(d){
+    var sc = window.screen || {}, aw = sc.availWidth || 1600, ah = sc.availHeight || 900;
+    var wp = Math.max(30, Math.min(95, Math.round((+d.w || 1200) / aw * 100)));
+    var hp = Math.max(40, Math.min(95, Math.round((+d.h || 820) / ah * 100)));
+    var url = location.origin + location.pathname.replace(/[^\/]*$/, '') + 'pop.html?port=' + port
+            + '#' + encodeURIComponent(JSON.stringify({fn: d.fn, args: d.args || [], t: Date.now()}));
+    var go = function(){
+      Office.context.ui.displayDialogAsync(url, {width: wp, height: hp, displayInIframe: false, promptBeforeOpen: false}, function(r){
+        var ok = r.status === Office.AsyncResultStatus.Succeeded;
+        try{ frame.contentWindow.postMessage({type: 'amai-pop-result', ok: ok, id: d.id}, APP); }catch(e){}
+        if(!ok) return;
+        dlg = r.value;
+        dlg.addEventHandler(Office.EventType.DialogMessageReceived, function(){ try{ dlg.close(); }catch(e){} dlg = null; });
+        dlg.addEventHandler(Office.EventType.DialogEventReceived, function(){ dlg = null; });
+      });
+    };
+    if(dlg){ try{ dlg.close(); }catch(e){} dlg = null; setTimeout(go, 300); } else go();   // 한 번에 하나만 열 수 있다
+  }
   document.getElementById('retry').onclick = connect;
   document.getElementById('openApp').onclick = function(){ window.open(APP + '/', '_blank'); };
 

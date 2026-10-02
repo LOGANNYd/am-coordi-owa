@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AM DATA</title>
+<!-- Outlook 대화상자 창 (2026-10-02)
+     패널(index.html)이 Office 대화상자(displayDialogAsync)로 이 페이지를 독립 창으로 띄운다 — 크롬 탭에 붙지 않음.
+     이 페이지는 PC 앱의 '큰 창 전용 화면'(/?owa=1&pop=1#{함수, 인자})을 꽉 차게 담기만 한다. -->
+<script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+<style>
+  html,body{margin:0;height:100%;background:#f6f7f9;font-family:"Segoe UI","Malgun Gothic",sans-serif}
+  iframe{border:0;width:100%;height:100%;display:block}
+</style>
+</head>
+<body>
+<iframe id="app" title="AM DATA" allow="local-network-access; clipboard-write"></iframe>
+<script>
+(function(){
+  var qs = new URLSearchParams(location.search);
+  var port = (qs.get('port') || '5174').replace(/\D/g,'') || '5174';
+  var APP = 'http://127.0.0.1:' + port;
+  document.getElementById('app').src = APP + '/?owa=1&pop=1' + location.hash;
+  // 앱 안에서 창을 모두 닫으면 이 대화상자도 닫는다
+  window.addEventListener('message', function(e){
+    if(e.origin !== APP || !e.data) return;
+    if(e.data.type === 'amai-close'){
+      try{ Office.context.ui.messageParent('close'); }catch(err){ try{ window.close(); }catch(e2){} }
+    }
+    if(e.data.type === 'amai-title' && e.data.title){ document.title = e.data.title; }
+  });
+  Office.onReady(function(){});
+})();
+</script>
+</body>
+</html>
