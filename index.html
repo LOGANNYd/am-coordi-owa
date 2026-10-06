@@ -4524,6 +4524,37 @@ async function rowEditCrm(btn) {
   function owaCompose(d, cb){
     var list = function(v){ return String(v || '').split(/[;,]/).map(function(x){ return x.trim(); }).filter(Boolean); };
     var form = {toRecipients: list(d.to), ccRecipients: list(d.cc), subject: String(d.subject || ''), htmlBody: String(d.html || '')};
+    // 수주 알림 '전달'(2026-10-06): Office.js 엔 전달 창 API 가 없어 새 메일 = 표 + 원래 메일 머리·본문 + 원래 메일 첨부(PO 파일 포함)
+    var it = d.forward && Office.context.mailbox && Office.context.mailbox.item;
+    if(it && it.body && !d._fwdDone){
+      var esc = function(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); };
+      var who = function(a){ return a ? esc((a.displayName || '') + ' <' + (a.emailAddress || '') + '>') : ''; };
+      var hd = '<hr style="border:0;border-top:1px solid #b5c4df;margin:14px 0 8px;">'
+        + '<div style="font-family:Calibri,\'맑은 고딕\',sans-serif;font-size:11pt;">'
+        + '<b>From:</b> ' + who(it.from) + '<br><b>Sent:</b> ' + esc(it.dateTimeCreated ? new Date(it.dateTimeCreated).toLocaleString() : '')
+        + '<br><b>To:</b> ' + (it.to || []).map(who).join('; ')
+        + ((it.cc || []).length ? '<br><b>Cc:</b> ' + it.cc.map(who).join('; ') : '')
+        + '<br><b>Subject:</b> ' + esc(it.subject || '') + '</div><br>';
+      if(it.itemId) form.attachments = [{type: 'item', itemId: it.itemId, name: String(it.subject || 'mail').slice(0, 80)}];
+      it.body.getAsync(Office.CoercionType.Html, function(r){
+        var body = (r && r.status === Office.AsyncResultStatus.Succeeded) ? String(r.value || '') : '';
+        var mk = function(b){ return form.htmlBody + hd + b; };
+        if(mk(body).length > 30000){                 // 새 메일 창 본문 한도(32KB) — 넘으면 글자만
+          it.body.getAsync(Office.CoercionType.Text, function(t){
+            var tx = (t && t.status === Office.AsyncResultStatus.Succeeded) ? String(t.value || '') : '';
+            var room = Math.max(0, 29000 - (form.htmlBody + hd).length);
+            form.htmlBody = mk('<div style="white-space:pre-wrap;font-family:Calibri,sans-serif;font-size:11pt;">'
+              + esc(tx.slice(0, room)) + (tx.length > room ? '\n… (원문은 첨부된 메일을 보세요)' : '') + '</div>');
+            owaCompose(Object.assign({}, d, {_fwdDone: true, _form: form}), cb);
+          });
+          return;
+        }
+        form.htmlBody = mk(body);
+        owaCompose(Object.assign({}, d, {_fwdDone: true, _form: form}), cb);
+      });
+      return;
+    }
+    if(d._form) form = d._form;
     try{
       var mb = Office.context.mailbox;
       if(mb.displayNewMessageFormAsync){
