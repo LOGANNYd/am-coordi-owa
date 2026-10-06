@@ -277,6 +277,7 @@ textarea.s-input{width:100%;height:64px;resize:vertical;font-size:12px}
 .he-v input[type=text]:focus{border-color:#0071e3;outline:none;box-shadow:0 0 0 3px rgba(30,111,217,.08)}
 .he-v input[type=checkbox]{width:16px;height:16px;accent-color:#0071e3;cursor:pointer}
 .he-v.chg input[type=text]{border-color:#248a3d;background:#f0fdf6}
+.he-v.chg:has(input[type=checkbox]){background:#f0fdf6;border-radius:6px;box-shadow:inset 0 0 0 1.5px #248a3d}
 .he-v.lk{opacity:.55}
 .he-dwgmenu{position:fixed;z-index:1100;background:#fff;border:1px solid #d2d2d7;border-radius:9px;box-shadow:0 14px 34px rgba(10,20,50,.22);min-width:340px;max-width:min(640px,94vw);overflow:auto;padding:4px}
 .he-dwgi{display:flex;align-items:center;gap:7px;padding:6px 8px;font-size:11.5px;color:#1d1d1f;text-decoration:none;border-radius:6px;white-space:nowrap}
@@ -782,7 +783,7 @@ html.owa.dlg .overlay .modal{width:100vw!important;max-width:100vw!important;hei
 <div class="overlay" id="descModal"><div class="modal wide"><div class="modal-hd"><div><h2 id="descTitle">상세</h2><div id="descSub" style="font-size:12px;color:#6e6e73;margin-top:3px"></div></div><button class="x" data-close>✕</button></div><div class="modal-bd" id="descBody"></div></div></div>
 <div class="overlay" id="editModal"><div class="modal wide" style="width:min(620px,96vw)">
   <div class="modal-hd"><div><h2 id="editTitle">✏️ 관리대장 행 편집</h2><div id="editSub" style="font-size:12px;color:#6e6e73;margin-top:3px"></div></div>
-    <div style="display:flex;gap:8px;align-items:center"><span id="editDwg" style="position:relative"></span><button class="x" data-close>✕</button></div></div>
+    <div style="display:flex;gap:8px;align-items:center"><button class="mini b" id="editCrmBtn" onclick="rowEditCrm(this)" title="CRM·ERP 견적·수주 실적으로 견적·수주·금액·SERVICE 칸을 '변경'에 미리 채웁니다 (저장은 직접)">CRM 데이터 받아오기</button><span id="editDwg" style="position:relative"></span><button class="x" data-close>✕</button></div></div>
   <div class="modal-bd" id="editBody"></div>
   <div style="padding:12px 20px;border-top:1px solid #e5e5ea;display:flex;gap:8px;align-items:center;flex-wrap:wrap;position:sticky;bottom:0;background:#fff;border-radius:0 0 16px 16px">
     <button class="btn" onclick="rowEditSave(this)">💾 저장 (Ctrl+S)</button>
@@ -1961,14 +1962,16 @@ document.addEventListener('click', e => {
 // ── 관리대장 행 편집 ── 앱(AM-Ai-Coordi)의 편집 창과 같은 계약을 쓴다.
 //   읽기 /api/hull/row  → {groups:[{g, items:[{c,h,v}]}]}
 //   저장 /api/hull/update ← fields{'H:<시트 헤더 원문>': 값}  (바뀐 칸만)
-//   ※ 자동채움 버튼은 요청대로 넣지 않는다. 잠금 열은 앱과 동일.
+//   CRM 데이터 받아오기 /api/hull/autofill → '변경' 칸에 미리 채움, 저장은 사용자가 (2026-10-06 사용자 요청으로 추가). 잠금 열은 앱과 동일.
 const HE_LOCK = ['프로젝트', 'DRAWNO', '설계담당자', '2025수주금액'];
 const heNorm = h => String(h || '').replace(/\s+/g, '').toUpperCase();
-let editCols = [], editKeys = null;
+let editCols = [], editKeys = null, editCtx = null;
 
 async function openRowEdit(id) {
   const v = ALL[id];
   editKeys = {tab: v._t, order: v.order || '', imo: v.imo || '', ship: v.ship || ''};
+  editCtx = {hull: v.project || '', item: v._t};
+  if ($('editCrmBtn')) { $('editCrmBtn').style.display = LOCAL_OK ? '' : 'none'; $('editCrmBtn').disabled = false; $('editCrmBtn').textContent = 'CRM 데이터 받아오기'; }
   $('editSub').innerHTML = `${esc(v.ship)} <span class="muted">· ${esc(v._t)} · IMO ${esc(v.imo || '-')}</span>`;
   $('editDwg').innerHTML = (v._t === 'BWTS' && v.draw)
     ? `<button class="mini he-dwgbtn" onclick="heDwgMenu(this, '${jsq(v.draw)}', 'BWTS')">📐 도면 열기 ▾</button>` : '';
@@ -4109,6 +4112,187 @@ function rfApply(cid){
   const st=tableState[cid];
   if($(cid)) renderVesselTable(cid, rows, (st&&st.opts)||{pinkNoJoin:true, numbered:true});
 }
+
+// ── 담당자 바꾸기 (카드의 담당자 배지를 누르면, 2026-10-06) ─────────────────────
+// 팀 공용 분장표(member_map.json — 대시보드 ⚙ 분장 설정과 같은 파일)에 저장한다. 누가·언제·무엇을 남기고 되돌릴 수 있다.
+var MEM_COL={'윤석준':['#dbeafe','#1d4ed8'],'최재원':['#d1fae5','#1d5c33'],'채준식':['#fef3c7','#92400e'],'염예준':['#ede9fe','#5b21b6'],'미배정':['#fff1e0','#c2410c']};
+function _memE(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+function _memToast(m){ if(typeof toast==='function') toast(m); }
+function _memPaint(btn, mem){
+  var c=MEM_COL[mem]||['#f3f4f6','#4b5563'];
+  btn.style.background=c[0]; btn.style.color=c[1]; btn.textContent=mem+' ▾';
+}
+async function memberMenu(btn){
+  document.querySelectorAll('.mem-pop').forEach(function(p){ p.remove(); });
+  var owner=btn.getAttribute('data-owner')||'', country=btn.getAttribute('data-country')||'';
+  var pop=document.createElement('div'); pop.className='mem-pop';
+  pop.style.cssText='position:fixed;z-index:2147483002;background:#fff;border:1px solid #d9dee7;border-radius:10px;'
+    +'box-shadow:0 12px 30px rgba(15,25,45,.22);padding:12px 14px;width:300px;max-width:calc(100vw - 16px);'
+    +'font:12.5px "Segoe UI","Malgun Gothic",sans-serif;color:#1b2433;line-height:1.5';
+  pop.innerHTML='<div style="color:#7a839a">불러오는 중…</div>';
+  document.body.appendChild(pop);
+  var place=function(){
+    var r=btn.getBoundingClientRect(), w=pop.offsetWidth, h=pop.offsetHeight;
+    pop.style.left=Math.max(8, Math.min(r.left, window.innerWidth-w-8))+'px';
+    pop.style.top=((r.bottom+6+h<window.innerHeight)? r.bottom+6 : Math.max(8, r.top-h-6))+'px';
+  };
+  place();
+  setTimeout(function(){ document.addEventListener('mousedown', function h(e){
+    if(!pop.contains(e.target) && e.target!==btn){ pop.remove(); document.removeEventListener('mousedown',h); } }); },0);
+  var j=null;
+  try{ j=await (await fetch('/api/member_info?owner='+encodeURIComponent(owner)+'&country='+encodeURIComponent(country),{cache:'no-store'})).json(); }catch(e){}
+  if(!pop.isConnected) return;
+  if(!j||!j.ok){ pop.innerHTML='<div style="color:#c2410c">담당자 정보를 불러오지 못했습니다'+(j&&j.error?' — '+_memE(j.error):'')+'</div>'; return; }
+  var basis=j.basis==='owner'?'선주사 지정':(j.basis==='country'?('국가 '+_memE(j.country_key)+' 기준'):'지정 없음');
+  // 한국은 선주사별로 나누므로 범위를 묻고(기본 '이 선주사만'), 그 밖의 나라는 국가 단위라 바로 '이 나라 전체' (2026-10-06)
+  var KR=(j.country_key==='KOREA');
+  var scope=KR?'owner':'country', pick=j.member;
+  var radio=function(v,lab,n){ return '<label style="display:flex;gap:6px;align-items:center;cursor:pointer;margin:2px 0">'
+    +'<input type="radio" name="memScope" value="'+v+'"'+(v===scope?' checked':'')+'><span><b>'+lab+'</b> <span style="color:#7a839a">'+n+'척</span></span></label>'; };
+  var scopeHtml=KR
+    ? radio('owner','이 선주사만 · '+_memE(owner||'-'), j.n_owner)+radio('country','한국 전체', j.n_country)
+    : '<div style="background:#f6f7f9;border-radius:7px;padding:6px 9px">'+_memE(j.country_key||'-')+' <b>'+j.n_country+'척</b> 전체의 담당이 바뀝니다</div>';
+  var who=function(m){ var c=MEM_COL[m]||['#f3f4f6','#4b5563'];
+    return '<button type="button" data-m="'+_memE(m)+'" style="border:2px solid '+(m===pick?c[1]:'transparent')+';background:'+c[0]+';color:'+c[1]
+      +';font-weight:700;border-radius:999px;padding:3px 10px;cursor:pointer;font:inherit;font-weight:700">'+_memE(m)+'</button>'; };
+  var logHtml=(j.log||[]).map(function(r){
+    return '<div style="display:flex;gap:6px;align-items:center;border-top:1px solid #f0f2f7;padding:4px 0">'
+      +'<span style="flex:1;min-width:0;color:#5a6480;font-size:11.5px">'+_memE(r.at||'')+' · '+_memE(r.by||'')+'<br>'
+      +'<b style="color:#1b2433">'+_memE(r.label||r.key)+'</b> '+(r.scope==='country'?'(나라)':'(선주사)')+' : '
+      +_memE(r.before||'기본값')+' → '+_memE(r.after||'기본값')+(r.undo?' <span style="color:#7a839a">(되돌림)</span>':'')+'</span>'
+      +(r.undo?'':'<button type="button" data-undo="'+_memE(r.id)+'" style="border:1px solid #d9dee7;background:#fff;border-radius:6px;font:inherit;font-size:11px;padding:2px 8px;cursor:pointer">되돌리기</button>')
+      +'</div>'; }).join('');
+  pop.innerHTML='<div style="font-weight:700;font-size:13.5px;margin-bottom:2px">담당자 바꾸기</div>'
+    +'<div style="color:#5a6480;margin-bottom:8px">지금 <b>'+_memE(j.member)+'</b> <span style="color:#7a839a">('+basis+')</span></div>'
+    +scopeHtml
+    +'<div class="mem-who" style="display:flex;gap:5px;flex-wrap:wrap;margin:10px 0">'+(j.members||[]).map(who).join('')+'</div>'
+    +'<div style="display:flex;gap:6px;justify-content:flex-end;align-items:center"><span class="mem-msg" style="flex:1;color:#c2410c;font-size:11.5px"></span>'
+    +'<button type="button" class="mem-x" style="border:1px solid #d9dee7;background:#fff;border-radius:7px;padding:5px 12px;cursor:pointer;font:inherit">닫기</button>'
+    +'<button type="button" class="mem-save" style="border:0;background:#1f5fae;color:#fff;border-radius:7px;padding:5px 14px;cursor:pointer;font:inherit;font-weight:700">저장</button></div>'
+    +(logHtml?'<div style="margin-top:8px"><div style="font-weight:700;font-size:12px;margin-bottom:2px">최근 변경</div>'+logHtml+'</div>':'');
+  place();
+  pop.querySelectorAll('input[name=memScope]').forEach(function(r){ r.onchange=function(){ scope=r.value; }; });
+  pop.querySelectorAll('.mem-who button').forEach(function(b){ b.onclick=function(){
+    pick=b.getAttribute('data-m');
+    pop.querySelectorAll('.mem-who button').forEach(function(x){ var c=MEM_COL[x.getAttribute('data-m')]||['#f3f4f6','#4b5563'];
+      x.style.borderColor=(x===b)?c[1]:'transparent'; }); }; });
+  pop.querySelector('.mem-x').onclick=function(){ pop.remove(); };
+  var after=function(){
+    if(typeof loadSharedMemberMap==='function') loadSharedMemberMap();   // 대시보드 화면의 담당자 표도 새로
+  };
+  pop.querySelector('.mem-save').onclick=async function(){
+    var msg=pop.querySelector('.mem-msg'); this.disabled=true; msg.textContent='';
+    var r=null;
+    try{ r=await (await fetch('/api/member_set',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({scope:scope, member:pick, owner:owner, country:country})})).json(); }catch(e){}
+    if(!r||!r.ok){ msg.textContent='저장 실패'+(r&&r.error?' — '+r.error:''); this.disabled=false; return; }
+    // 같은 화면의 같은 선주사(또는 같은 나라) 배지도 바꾼다
+    document.querySelectorAll('.hs-mem').forEach(function(x){
+      if(x===btn || (scope==='owner' && x.getAttribute('data-owner')===owner) || (scope==='country' && x.getAttribute('data-country')===country)) _memPaint(x, r.member);
+    });
+    _memToast('✅ 담당자 저장 — '+(scope==='owner'?owner:j.country_key)+' → '+pick);
+    pop.remove(); after();
+  };
+  pop.querySelectorAll('[data-undo]').forEach(function(b){ b.onclick=async function(){
+    b.disabled=true;
+    try{ await fetch('/api/member_undo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:b.getAttribute('data-undo')})}); }catch(e){}
+    var k=null; try{ k=await (await fetch('/api/member_info?owner='+encodeURIComponent(owner)+'&country='+encodeURIComponent(country),{cache:'no-store'})).json(); }catch(e){}
+    if(k&&k.ok) _memPaint(btn, k.member);
+    _memToast('↩ 되돌렸습니다'); after(); memberMenu(btn);
+  }; });
+}
+
+// ── 카드에서 선주사·국가 바로 고치기 (값 옆 [수정], 2026-10-06) ─────────────────────
+// 행 편집 창을 열지 않고 그 자리에서: 관리대장에 이미 있는 이름을 자동완성으로 골라 저장 → 시트에 바로 반영.
+var _feNames=null;
+var FE_BTN_STYLE='border:1px solid #c5cdd9;background:#fff;cursor:pointer;color:#3b4a63;font-size:11px;font-weight:600;padding:1px 8px;margin-left:6px;border-radius:10px;line-height:16px;vertical-align:middle';
+async function _feLoadNames(){
+  if(_feNames) return _feNames;
+  try{ var j=await (await fetch('/api/fleet/names',{cache:'no-store'})).json(); if(j&&j.ok) _feNames=j; }catch(e){}
+  return _feNames||{owners:[],countries:[]};
+}
+async function hullFieldEdit(btn){
+  var card=btn.closest('.hs-card'); if(!card) return;
+  var td=btn.closest('td'), f=btn.getAttribute('data-f'), cur=btn.getAttribute('data-v')||'';
+  var keep=td.innerHTML, lid='feList'+Date.now();
+  td.innerHTML='<div style="display:flex;gap:4px;align-items:center">'
+    +'<input class="fe-in" list="'+lid+'" value="'+_memE(cur)+'" placeholder="'+(f==='owner'?'선주사':'국가')+' 입력·선택" '
+    +'style="flex:1;min-width:0;height:26px;border:1px solid #7c8cf8;border-radius:6px;padding:0 7px;font:inherit;font-size:12px">'
+    +'<datalist id="'+lid+'"></datalist>'
+    +'<button type="button" class="fe-ok" style="height:26px;border:0;background:#1f5fae;color:#fff;border-radius:6px;padding:0 9px;cursor:pointer;font:inherit;font-size:12px;font-weight:700">저장</button>'
+    +'<button type="button" class="fe-no" style="height:26px;border:1px solid #d9dee7;background:#fff;border-radius:6px;padding:0 8px;cursor:pointer;font:inherit;font-size:12px">취소</button></div>'
+    +'<div class="fe-msg" style="font-size:11px;color:#7a839a;margin-top:2px">목록에서 고르면 표기가 통일됩니다</div>';
+  var inp=td.querySelector('.fe-in'); inp.focus(); inp.select();
+  var names=await _feLoadNames(), list=(f==='owner'?names.owners:names.countries)||[];
+  td.querySelector('datalist').innerHTML=list.map(function(x){ return '<option value="'+_memE(x[0])+'">'+x[1]+'척</option>'; }).join('');
+  td.querySelector('.fe-no').onclick=function(){ td.innerHTML=keep; };
+  inp.onkeydown=function(e){ if(e.key==='Enter') td.querySelector('.fe-ok').click(); if(e.key==='Escape') td.querySelector('.fe-no').click(); };
+  td.querySelector('.fe-ok').onclick=async function(){
+    var v=inp.value.trim(), msg=td.querySelector('.fe-msg'), ok=this;
+    if(v===cur){ td.innerHTML=keep; return; }
+    if(!v){ msg.textContent='값을 넣어 주세요'; msg.style.color='#c2410c'; return; }
+    ok.disabled=true; msg.textContent='시트에 저장 중…'; msg.style.color='#7a839a';
+    var k={tab:card.getAttribute('data-tab')||'', order:card.getAttribute('data-order')||'',
+           imo:card.getAttribute('data-imo')||'', ship:card.getAttribute('data-ship')||''};
+    var hdr=null;
+    try{
+      var r=await (await fetch('/api/hull/row',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(k)})).json();
+      var want=(f==='owner')?['선주사','SHIPOWNER','OWNER']:['국가','COUNTRY'];
+      (r.cols||[]).some(function(c){ var h=String(c.h||'').replace(/\s+/g,'').toUpperCase(); if(want.indexOf(h)>=0){ hdr=c.h; return true; } return false; });
+    }catch(e){}
+    if(!hdr){ msg.textContent='시트에서 열을 찾지 못했습니다'; msg.style.color='#c2410c'; ok.disabled=false; return; }
+    var fields={}; fields['H:'+hdr]=v;
+    var u=null;
+    try{ u=await (await fetch('/api/hull/update',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(Object.assign({},k,{fields:fields}))})).json(); }catch(e){}
+    if(!u||!u.ok){ msg.textContent='저장 실패'+(u&&u.error?' — '+u.error:''); msg.style.color='#c2410c'; ok.disabled=false; return; }
+    _feNames=null;
+    if(f==='owner') card.setAttribute('data-owner', v);
+    var fn=(f==='owner')?'fleetOwnerOpen':'fleetCountryOpen';
+    td.innerHTML='<button class="hs-lnk" data-k="'+_memE(v)+'" onclick="'+fn+'(this.getAttribute(&quot;data-k&quot;))" title="'+_memE(v)+'">'
+      +_memE(v)+'<span class="hs-lnkgo">&#9656;</span></button>'
+      +'<button type="button" class="hs-fe" data-f="'+f+'" data-v="'+_memE(v)+'" onclick="hullFieldEdit(this)" title="바꾸기" style="'+FE_BTN_STYLE+'">수정</button>';
+    var mc=card.querySelector('.hs-mem');                     // 담당자도 새 값 기준으로
+    if(mc){
+      mc.setAttribute(f==='owner'?'data-owner':'data-country', v);
+      try{ var mi=await (await fetch('/api/member_info?owner='+encodeURIComponent(mc.getAttribute('data-owner')||'')
+        +'&country='+encodeURIComponent(mc.getAttribute('data-country')||''),{cache:'no-store'})).json();
+        if(mi&&mi.ok) _memPaint(mc, mi.member); }catch(e){}
+    }
+    _memToast('✅ '+(f==='owner'?'선주사':'국가')+' 저장 — '+v);
+  };
+}
+
+// ── 행편집: CRM 데이터 받아오기 (앱 카드의 '⚡ CRM에서 채우기'와 같은 규칙, 2026-10-06) ──
+async function rowEditCrm(btn) {
+  if (!editKeys) return;
+  const msg = $('editMsg');
+  btn.disabled = true; btn.textContent = 'CRM 조회 중…';
+  let j = null;
+  try {
+    j = await (await fetch('/api/hull/autofill', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({...editKeys, ...(editCtx || {})})})).json();
+  } catch (e) { j = {ok:false, error:e.message}; }
+  btn.disabled = false; btn.textContent = 'CRM 데이터 받아오기';
+  if (!j || !j.ok) { msg.style.color = '#d70015'; msg.textContent = 'CRM 데이터를 받지 못했습니다: ' + ((j && j.error) || ''); return; }
+  const fill = j.fill || {}, why = j.why || {};
+  let n = 0;
+  $('editBody').querySelectorAll('.he-i').forEach(el => {
+    const c = editCols[+el.dataset.i]; if (!c) return;
+    const k = 'H:' + c.h; if (!(k in fill)) return;
+    const old = String(c.v == null ? '' : c.v), nv = String(fill[k] == null ? '' : fill[k]);
+    if (old === '' && nv === 'FALSE') return;            // 비어 있던 칸을 FALSE 로 바꾸는 제안은 안 함
+    if (el.type === 'checkbox') el.checked = (nv === 'TRUE'); else el.value = nv;
+    el.title = why[k] ? 'CRM 근거: ' + why[k] : '';
+    const box = el.closest('.he-v');
+    const changed = old !== (el.type === 'checkbox' ? (el.checked ? 'TRUE' : 'FALSE') : el.value);
+    box.classList.toggle('chg', changed);
+    if (changed) n++;
+  });
+  msg.style.color = n ? '#248a3d' : '#6e6e73';
+  msg.innerHTML = 'CRM ' + (j.n_crm || 0) + '건 기준 — ' + (n ? '<b>' + n + '칸</b> 채웠습니다. 초록으로 바뀐 칸을 확인하고 💾 저장을 누르세요. (칸에 마우스를 올리면 근거)' : '바꿀 값이 없습니다.')
+    + ((j.alias && j.alias.length) ? '<br><span style="color:#b45309">⚠ 옛 선명 기록 포함: ' + esc(j.alias.join(', ')) + ' — 같은 배가 맞는지 한번 확인해보세요</span>' : '');
+}
 </script>
 
 <!-- ═══ Outlook 패널 (앱 없이 HTML 만, 2026-10-06) ═══ -->
@@ -4331,7 +4515,24 @@ function rfApply(cid){
     if(!appFrame || e.source !== appFrame.contentWindow || !e.data) return;
     if(e.data.type === 'amai-ready'){ appReadyCb && appReadyCb(); if(APPMODE && lastMail) sendApp(lastMail); }
     if(e.data.type === 'amai-pop') openAppDialog(e.data);
+    if(e.data.type === 'amai-compose') owaCompose(e.data, function(ok, err){
+      try{ appFrame.contentWindow.postMessage({type: 'amai-compose-result', id: e.data.id, ok: ok, error: err || ''}, APP); }catch(x){}
+    });
   });
+  // 앱이 만든 메일(재수주·수주알림) → 지금 Outlook(새 Outlook·웹)의 새 메일 작성창으로 (2026-10-06)
+  //   클래식 Outlook(COM) 을 안 쓰므로 새 Outlook 만 쓰는 PC 에서도 열린다. 서명은 Outlook 설정대로 붙는다.
+  function owaCompose(d, cb){
+    var list = function(v){ return String(v || '').split(/[;,]/).map(function(x){ return x.trim(); }).filter(Boolean); };
+    var form = {toRecipients: list(d.to), ccRecipients: list(d.cc), subject: String(d.subject || ''), htmlBody: String(d.html || '')};
+    try{
+      var mb = Office.context.mailbox;
+      if(mb.displayNewMessageFormAsync){
+        mb.displayNewMessageFormAsync(form, function(r){
+          cb(r.status === Office.AsyncResultStatus.Succeeded, r.error && r.error.message);
+        });
+      } else { mb.displayNewMessageForm(form); cb(true); }
+    }catch(e){ cb(false, String(e && e.message || e)); }
+  }
   // 앱의 큰 창 → Outlook 대화상자(pop.html 이 앱 화면을 담는다)
   function openAppDialog(d){
     var sc = window.screen || {}, aw = sc.availWidth || 1600, ah = sc.availHeight || 900;
@@ -4346,7 +4547,11 @@ function rfApply(cid){
           try{ appFrame.contentWindow.postMessage({type: 'amai-pop-result', ok: ok, id: d.id}, APP); }catch(e){}
           if(!ok) return;
           dlgApp = r.value;
-          dlgApp.addEventHandler(Office.EventType.DialogMessageReceived, function(){ try{ dlgApp.close(); }catch(e){} dlgApp = null; });
+          dlgApp.addEventHandler(Office.EventType.DialogMessageReceived, function(m){
+            var c = null; try{ c = JSON.parse(m.message); }catch(e){}
+            if(c && c.compose){ owaCompose(c.compose, function(){}); return; }   // 큰 창에서 누른 메일 작성
+            try{ dlgApp.close(); }catch(e){} dlgApp = null;
+          });
           dlgApp.addEventHandler(Office.EventType.DialogEventReceived, function(){ dlgApp = null; });
         });
       }catch(e){ try{ appFrame.contentWindow.postMessage({type: 'amai-pop-result', ok: false, id: d.id}, APP); }catch(e2){} }

@@ -28,6 +28,12 @@
       try{ Office.context.ui.messageParent('close'); }catch(err){ try{ window.close(); }catch(e2){} }
     }
     if(e.data.type === 'amai-title' && e.data.title){ document.title = e.data.title; }
+    // 메일 작성은 패널이 연다(대화상자에선 작성창을 못 연다) → 패널로 넘긴다 (2026-10-06)
+    if(e.data.type === 'amai-compose'){
+      var ok = true;
+      try{ Office.context.ui.messageParent(JSON.stringify({compose: e.data})); }catch(err){ ok = false; }
+      try{ e.source.postMessage({type: 'amai-compose-result', id: e.data.id, ok: ok, error: ok ? '' : '패널에 전달하지 못했습니다'}, APP); }catch(err){}
+    }
   });
   Office.onReady(function(){});
 })();
