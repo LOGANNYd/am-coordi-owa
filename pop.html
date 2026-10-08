@@ -29,6 +29,16 @@
     }
     if(e.data.type === 'amai-title' && e.data.title){ document.title = e.data.title; }
     // 메일 작성은 패널이 연다(대화상자에선 작성창을 못 연다) → 패널로 넘긴다 (2026-10-06)
+    // 교신내역 주소 → 열린 작성창의 AM DATA 패널이 받는다 (2026-10-08)
+    if(e.data.type === 'amai-addr'){
+      var d = e.data, src = e.source, id = 'a' + Date.now() + Math.random(), fin = false, bc = null;
+      var reply = function(res){ try{ src.postMessage(Object.assign({type: 'amai-addr-result', id: d.id}, res), APP); }catch(x){} };
+      try{ bc = new BroadcastChannel('amai-addr'); }catch(x){}
+      if(!bc){ reply({ok: false, nocompose: true}); return; }
+      bc.onmessage = function(m){ var x = m.data || {}; if(x.type === 'ack' && x.id === id && !fin){ fin = true; bc.close(); reply(x); } };
+      bc.postMessage({type: 'req', id: id, addr: d.addr, kind: d.kind});
+      setTimeout(function(){ if(!fin){ fin = true; bc.close(); reply({ok: false, nocompose: true}); } }, 1500);
+    }
     if(e.data.type === 'amai-compose'){
       var ok = true;
       try{ Office.context.ui.messageParent(JSON.stringify({compose: e.data})); }catch(err){ ok = false; }

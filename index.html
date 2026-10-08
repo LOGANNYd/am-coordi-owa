@@ -1553,6 +1553,7 @@ async function openRenewalMail(id) {
   try {
     const j = await (await fetch('/api/renewal_email', {method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({project:v.project || '', ship:v.ship || '', imo:v.imo || ''})})).json();
+    if (j.ok && j.compose) { await webComposeOpen(j.compose, {alert:true}); return; }   // 새 Outlook(M365)
     if (!j.ok) alert('재계약 알림 메일을 만들지 못했습니다.\n\n' + (j.error || ''));
   } catch (e) { alert('오류: ' + e.message); }
 }
@@ -2604,7 +2605,8 @@ async function openCalMail(btn, owner) {
   try {
     const j = await (await fetch('/api/salesmail/calibration', {method:'POST',
       headers:{'Content-Type':'application/json'}, body: JSON.stringify({owner, vessels})})).json();
-    if (!j.ok) alert('메일 작성 실패: ' + (j.error || ''));
+    if (j.ok && j.compose) await webComposeOpen(j.compose, {alert:true, brochure:true});   // 새 Outlook(M365)
+    else if (!j.ok) alert('메일 작성 실패: ' + (j.error || ''));
     else if (!j.attached) alert('작성창은 열었지만 브로셔를 찾지 못해 첨부하지 못했습니다.\n' + (j.brochure || ''));
   } catch (e) { alert('오류: ' + e.message); }
   btn.disabled = false; btn.textContent = label;
@@ -4293,6 +4295,37 @@ async function rowEditCrm(btn) {
   msg.innerHTML = 'CRM ' + (j.n_crm || 0) + '건 기준 — ' + (n ? '<b>' + n + '칸</b> 채웠습니다. 초록으로 바뀐 칸을 확인하고 💾 저장을 누르세요. (칸에 마우스를 올리면 근거)' : '바꿀 값이 없습니다.')
     + ((j.alias && j.alias.length) ? '<br><span style="color:#b45309">⚠ 옛 선명 기록 포함: ' + esc(j.alias.join(', ')) + ' — 같은 배가 맞는지 한번 확인해보세요</span>' : '');
 }
+
+// ── 새 Outlook(M365) 웹 작성창 (2026-10-08) ─────────────────────────────────
+// 새 Outlook 은 원격 조작이 안 돼서, 받는사람·참조·제목·본문을 채운 Outlook 웹 작성창을 연다.
+// 표 서식이 있는 본문은 클립보드에 복사 → 작성창 본문에서 Ctrl+A, Ctrl+V 하면 표 그대로 들어간다.
+// 첨부(브로셔)는 웹 링크로 못 넣으므로 브로셔 폴더를 열어 준다.
+async function webComposeOpen(c, opt){
+  opt=opt||{};
+  var copied=false;
+  try{
+    if(navigator.clipboard && window.ClipboardItem && c.html){
+      await navigator.clipboard.write([new ClipboardItem({
+        'text/html': new Blob([c.html],{type:'text/html'}),
+        'text/plain': new Blob([c.text||''],{type:'text/plain'})})]);
+      copied=true;
+    }
+  }catch(e){}
+  var base='https://outlook.office.com/mail/deeplink/compose?';
+  var qs=function(body){ return ['to','cc','subject'].map(function(k){ return c[k]?k+'='+encodeURIComponent(c[k]):''; })
+      .concat(body?['body='+encodeURIComponent(body)]:[]).filter(Boolean).join('&'); };
+  var url=base+qs(c.text||'');
+  if(url.length>7000) url=base+qs(copied?'(본문: Ctrl+V 로 붙여넣으세요)\n':'');   // 링크 길이 한도
+  var w=window.open(url,'_blank','noopener');
+  var msg='Outlook 웹 작성창을 열었습니다.'
+    +(copied?'\n\n· 표 서식 본문이 복사돼 있습니다 — 본문에서 Ctrl+A → Ctrl+V 하면 서식 그대로 들어갑니다.':'')
+    +(opt.brochure?'\n· 브로셔(PANASIA_MRO.pdf)는 직접 첨부해 주세요 — 폴더를 열어 드립니다.':'')
+    +'\n· 받는 사람을 넣고 보내세요.';
+  if(!w) msg='팝업이 막혀 작성창을 못 열었습니다. 주소창 오른쪽의 팝업 허용을 누른 뒤 다시 눌러 주세요.';
+  if(opt.brochure && w){ try{ fetch('/api/salesmail/brochure_open',{method:'POST'}); }catch(e){} }
+  if(typeof toast==='function' && !opt.alert) toast(msg.split('\n')[0]+(copied?' · 표 본문 복사됨(Ctrl+V)':'')); else alert(msg);
+  return !!w;
+}
 </script>
 
 <!-- ═══ Outlook 패널 (앱 없이 HTML 만, 2026-10-06) ═══ -->
@@ -4416,14 +4449,74 @@ async function rowEditCrm(btn) {
   function readMail(){
     var it = null; try{ it = Office.context.mailbox.item; }catch(e){}
     if(!it){ if(!APPMODE) showMatches([]); return; }
+    if(isCompose(it)){ readCompose(it); return; }
     it.body.getAsync(Office.CoercionType.Text, function(r){
       var from = it.from || it.sender || {};
+      var ad = function(a){ return a ? ((a.displayName || '') + ' <' + (a.emailAddress || '') + '>') : ''; };
       var m = {subject: it.subject || '', body: String((r && r.value) || '').slice(0, 30000),
-               sender: from.displayName || '', sender_email: from.emailAddress || ''};
+               sender: from.displayName || '', sender_email: from.emailAddress || '',
+               // 예약 CHS 등록 뒤 '안내메일'을 이 메일의 전달로 만들 때 쓴다 (2026-10-06)
+               item_id: it.itemId || '', sent: it.dateTimeCreated ? new Date(it.dateTimeCreated).toLocaleString() : '',
+               to: (it.to || []).map(ad).join('; '), cc: (it.cc || []).map(ad).join('; ')};
       lastMail = m;
       if(APPMODE) sendApp(m);
       else if(typeof ALL !== 'undefined' && ALL.length) showMatches(detect(m.subject + '\n' + m.body));
     });
+  }
+  // ── 작성창(새 메일·답장)에서 연 AM DATA (2026-10-08) ──
+  //   교신내역의 주소를 누르면 이 작성창의 받는사람/참조에 바로 넣는다 (클래식 Outlook 의 '열린 작성창에 넣기' 대체).
+  function isCompose(it){ return !!(it && it.subject && typeof it.subject.getAsync === 'function'); }
+  function readCompose(it){
+    var v = function(o, cb){ try{ o.getAsync(function(r){ cb(r && r.status === Office.AsyncResultStatus.Succeeded ? r.value : null); }); }catch(e){ cb(null); } };
+    var ad = function(a){ return a ? ((a.displayName || '') + ' <' + (a.emailAddress || '') + '>') : ''; };
+    v(it.subject, function(subj){
+      it.body.getAsync(Office.CoercionType.Text, function(r){
+        v(it.to, function(to){
+          v(it.cc, function(cc){
+            var m = {subject: subj || '', body: String((r && r.value) || '').slice(0, 30000), sender: '', sender_email: '',
+                     item_id: '', sent: '', to: (to || []).map(ad).join('; '), cc: (cc || []).map(ad).join('; '), compose: 1};
+            lastMail = m;
+            if(APPMODE) sendApp(m);
+            else if(typeof ALL !== 'undefined' && ALL.length) showMatches(detect(m.subject + '\n' + m.body));
+          });
+        });
+      });
+    });
+  }
+  // 받는사람/참조에 주소 1개 넣기 — 이미 있으면 그대로(dup)
+  function addRecipient(addr, kind, cb){
+    var it = null; try{ it = Office.context.mailbox.item; }catch(e){}
+    if(!isCompose(it)){ cb({ok: false, nocompose: true}); return; }
+    var box = kind === 'cc' ? it.cc : it.to, low = String(addr).toLowerCase();
+    box.getAsync(function(r){
+      var have = (r && r.value) || [];
+      if(have.some(function(a){ return String(a.emailAddress || '').toLowerCase() === low; })){ cb({ok: true, dup: true}); return; }
+      box.addAsync([addr], function(r2){
+        if(r2.status !== Office.AsyncResultStatus.Succeeded){ cb({ok: false, error: r2.error && r2.error.message}); return; }
+        var done = function(subj){ cb({ok: true, subject: subj || ''}); };
+        try{ it.subject.getAsync(function(r3){ done(r3 && r3.value); }); }catch(e){ done(''); }
+      });
+    });
+  }
+  // 다른 창(읽기 패널·큰 창)에서 누른 주소 → 열려 있는 작성창 패널이 받는다 (같은 github.io 끼리 BroadcastChannel)
+  var addrBC = null; try{ addrBC = new BroadcastChannel('amai-addr'); }catch(e){}
+  if(addrBC) addrBC.onmessage = function(e){
+    var d = e.data || {};
+    if(d.type !== 'req') return;
+    var it = null; try{ it = Office.context.mailbox.item; }catch(x){}
+    if(!isCompose(it)) return;                               // 작성창 패널만 대답
+    addRecipient(d.addr, d.kind, function(res){ try{ addrBC.postMessage(Object.assign({type: 'ack', id: d.id}, res)); }catch(x){} });
+  };
+  // 주소 넣기 요청 처리: 내가 작성창이면 직접, 아니면 열린 작성창 패널에 부탁 (1.5초 안에 대답 없으면 nocompose)
+  function routeAddr(d, cb){
+    var it = null; try{ it = Office.context.mailbox.item; }catch(e){}
+    if(isCompose(it)){ addRecipient(d.addr, d.kind, cb); return; }
+    if(!addrBC){ cb({ok: false, nocompose: true}); return; }
+    var id = 'a' + Date.now() + Math.random(), fin = false;
+    var h = function(e){ var x = e.data || {}; if(x.type === 'ack' && x.id === id && !fin){ fin = true; addrBC.removeEventListener('message', h); cb(x); } };
+    addrBC.addEventListener('message', h);
+    addrBC.postMessage({type: 'req', id: id, addr: d.addr, kind: d.kind});
+    setTimeout(function(){ if(!fin){ fin = true; addrBC.removeEventListener('message', h); cb({ok: false, nocompose: true}); } }, 1500);
   }
   var mailHooked = false;
   function hookMail(){
@@ -4515,6 +4608,9 @@ async function rowEditCrm(btn) {
     if(!appFrame || e.source !== appFrame.contentWindow || !e.data) return;
     if(e.data.type === 'amai-ready'){ appReadyCb && appReadyCb(); if(APPMODE && lastMail) sendApp(lastMail); }
     if(e.data.type === 'amai-pop') openAppDialog(e.data);
+    if(e.data.type === 'amai-addr') routeAddr(e.data, function(res){
+      try{ appFrame.contentWindow.postMessage(Object.assign({type: 'amai-addr-result', id: e.data.id}, res), APP); }catch(x){}
+    });
     if(e.data.type === 'amai-compose') owaCompose(e.data, function(ok, err){
       try{ appFrame.contentWindow.postMessage({type: 'amai-compose-result', id: e.data.id, ok: ok, error: err || ''}, APP); }catch(x){}
     });
@@ -4525,6 +4621,18 @@ async function rowEditCrm(btn) {
     var list = function(v){ return String(v || '').split(/[;,]/).map(function(x){ return x.trim(); }).filter(Boolean); };
     var form = {toRecipients: list(d.to), ccRecipients: list(d.cc), subject: String(d.subject || ''), htmlBody: String(d.html || '')};
     // 수주 알림 '전달'(2026-10-06): Office.js 엔 전달 창 API 가 없어 새 메일 = 표 + 원래 메일 머리·본문 + 원래 메일 첨부(PO 파일 포함)
+    // 예약 등록 끝난 뒤의 안내메일 — 예약 때 담아 둔 원래 메일(d.fwd)로 전달 (지금 고른 메일과 상관없이)
+    if(d.forward && d.fwd && !d._fwdDone){
+      var f = d.fwd, e2 = function(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); };
+      form.htmlBody += '<hr style="border:0;border-top:1px solid #b5c4df;margin:14px 0 8px;">'
+        + '<div style="font-family:Calibri,\'맑은 고딕\',sans-serif;font-size:11pt;">'
+        + '<b>From:</b> ' + e2(f.from) + '<br><b>Sent:</b> ' + e2(f.sent) + '<br><b>To:</b> ' + e2(f.to)
+        + (f.cc ? '<br><b>Cc:</b> ' + e2(f.cc) : '') + '<br><b>Subject:</b> ' + e2(f.subject) + '</div><br>'
+        + '<div style="white-space:pre-wrap;font-family:Calibri,sans-serif;font-size:11pt;">'
+        + e2(String(f.body || '').slice(0, Math.max(0, 29000 - form.htmlBody.length))) + '</div>';
+      if(f.item_id) form.attachments = [{type: 'item', itemId: f.item_id, name: String(f.subject || 'mail').slice(0, 80)}];
+      d = Object.assign({}, d, {_fwdDone: true, _form: form});
+    }
     var it = d.forward && Office.context.mailbox && Office.context.mailbox.item;
     if(it && it.body && !d._fwdDone){
       var esc = function(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); };
