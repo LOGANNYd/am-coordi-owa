@@ -990,8 +990,6 @@ html.owa.app body{overflow:hidden}
 .owa-agent #owaWake{border:1px solid #17508f;background:#1f5fae;color:#fff;border-radius:6px;height:28px;padding:0 12px;font:inherit;font-size:12px;font-weight:700;cursor:pointer}
 .owa-agent #owaWake:disabled{background:#94a3b8;border-color:#94a3b8;cursor:default}
 .owa-agent .owa-ic{width:28px;height:28px;border-radius:6px;margin-left:auto}
-/* 카드에서 연결기 없이 못 가져오는 값 */
-.hs-off{display:inline-block;font-size:10.5px;font-weight:700;color:#8a94a6;background:#f1f3f7;border:1px solid #dfe3ea;border-radius:6px;padding:0 6px;line-height:17px;letter-spacing:.3px}
 #owaSetup{display:none}
 html.owa.setup #owaSetup{display:block;padding:18px 16px}
 #owaSetup textarea{width:100%;box-sizing:border-box;height:84px;border:1px solid #d9dee7;border-radius:8px;padding:8px;font:12px Consolas,monospace}
@@ -6235,11 +6233,10 @@ setTimeout(() => { if (!ERPO) loadErpOrders(false); }, 9000);   // 앱 연결 �
   <div class="err" id="owaErr"></div>
 </div>
 <div id="owaPanel">
-  <!-- 2026-11-04: 앱(연결기) 화면과 같은 검색줄 — 연결기 없이 안 되는 그룹웨어·대시보드는 OFFLINE 으로만 -->
+  <!-- 2026-11-04: 앱(연결기) 화면과 같은 검색줄 — 오프라인에서 안 되는 버튼(그룹웨어·대시보드)은 빼고 OFFLINE 표시만 -->
   <div class="owa-top">
     <input id="owaQ" placeholder="선명·IMO·프로젝트·선주사" autocomplete="off">
     <button class="owa-btn" id="owaFind">찾기</button>
-    <button class="owa-btn off" disabled title="연결기가 켜지면 쓸 수 있습니다">그룹웨어</button>
     <button class="owa-btn off owa-offtag" disabled title="연결기가 꺼져 있습니다">OFFLINE</button>
   </div>
   <div id="owaAgentBar" class="owa-agent" style="display:none">
@@ -6324,8 +6321,7 @@ setTimeout(() => { if (!ERPO) loadErpOrders(false); }, 9000);   // 앱 연결 �
             + '<td>' + E(r.seq) + '</td><td>' + (amt ? E(r.curr || '') + ' ' + amt.toLocaleString() : '-') + '</td><td>' + E(r.status) + '</td></tr>';
         }).join('') + '</table></div>';
   }
-  // 2026-11-04: 앱 카드(sales_ledger.render_card)와 같은 묶음·순서·모양. 연결기 없이 못 가져오는 값만 OFFLINE.
-  var OFF = '<span class="hs-off">OFFLINE</span>';
+  // 2026-11-04: 앱 카드(sales_ledger.render_card)와 같은 묶음·순서·모양. 연결기 없이 못 가져오는 줄(AS 담당자·미수금 등)은 뺀다.
   function crmRows(v){
     if(typeof crmSnapRows === 'undefined' || !crmSnapRows.length) return null;
     var sn = nz(v.ship).trim(), pj = nz(v.project).trim(), ib = v._t === 'BWTS';
@@ -6337,7 +6333,7 @@ setTimeout(() => { if (!ERPO) loadErpOrders(false); }, 9000);   // 앱 연결 �
     });
   }
   function crmPill(rows, yr, kd){
-    if(!rows) return '<span class="hs-vw-off" style="margin-left:6px">' + OFF + '</span>';
+    if(!rows) return '';                     // 스냅샷이 없으면 건수 버튼도 없다
     var n = rows.filter(function(r){ return String(r.yr || String(r.date).slice(0, 4)) === yr && r.kind === kd; }).length;
     return '<button class="hs-crm' + (n ? '' : ' none') + '" data-yr="' + yr + '" data-kd="' + kd + '" onclick="window.__owa.crm(this)"'
       + ' title="' + E((typeof crmSnapAt !== 'undefined' && crmSnapAt ? crmSnapAt + ' 기준' : '')) + '">' + kd + ' <b>' + n + '</b></button>';
@@ -6366,13 +6362,13 @@ setTimeout(() => { if (!ERPO) loadErpOrders(false); }, 9000);   // 앱 연결 �
     if(scr){
       G.push(['SCRUBBER 정보', [['SYSTEM', E(v.system)], ['TUR / PaH', pair(E(v.tur), E(v.pah))], ['in TUR / in PaH', pair(E(v.inTur), E(v.inPah))],
         ['out TUR / out PaH', pair(E(v.outTur), E(v.outPah))], ['wtu TUR / wtu PaH', pair(E(v.wtuTur), E(v.wtuPah))], ['OTP DATE', E(v.otp)],
-        ['AS 담당자', OFF]]]);
+      ]]);
       G.push(['수주현황', [['2025 수주', chk(v.o25)], ['2026 견적', chk(v.e26)], ['2026 수주', chk(v.o26)],
         ['계약 STATUS', E(v.status)], ['REMARK', E(v.remark)]]]);
     } else {
       var pt = (v.pt ? E(v.pt) + ' EA' : '') + (v.mtr ? ' (' + E(v.mtr) + ' MTR)' : '');
       G.push(['BWTS 정보', [['용량 SPEC', spec(v.spec)], ['PT SENSOR', pt.trim()], ['TT / TT(EX)', pair(ea(v.tt), ea(v.ttex))],
-        ['UVI / FMU', pair(ea(v.uvi), ea(v.fmu))], ['도면번호', E(v.draw)], ['설계담당자', pill(v.designer, '#f1f3f7', '#3b4a5f')], ['AS 담당자', OFF]]]);
+        ['UVI / FMU', pair(ea(v.uvi), ea(v.fmu))], ['도면번호', E(v.draw)], ['설계담당자', pill(v.designer, '#f1f3f7', '#3b4a5f')]]]);
       G.push(['수주현황', [['2025 견적', chk(v.e25)], ['2025 수주', chk(v.o25)], ['2025 실행일자', E(v.d25)], ['2025 수주금액', money(v.a25)],
         ['2026 견적', chk(v.e26)], ['2026 수주', chk(v.o26)], ['2026 실행일자', E(v.d26)], ['2026 수주금액', money(v.a26)],
         ['2026 실비금액', money(v.x26)], ['2026 수주총액', money(v.t26)], ['SERVICE 형태', E(v.svc)], ['REMARK', E(v.remark)]]]);
