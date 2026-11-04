@@ -695,6 +695,18 @@ body.sb-min .logo b{color:var(--pm-text)}
 #mBody .hs-card{max-width:none;border:0;padding:0}
 #mBody .hs-nslot{display:none}
 #mBody .hs-v .grp-link{font-weight:600}
+
+/* 메뉴 접기 = 햄버거 버튼 (2026-11-04) — 메뉴 아이콘과 같은 선 굵기·모서리. 로고 줄 왼쪽에 붙인다 */
+.logo{display:flex;align-items:center;gap:8px;text-align:left;padding:14px 12px 12px}
+.logo b{line-height:1}
+.sb-toggle{position:static;flex:0 0 auto;width:32px;height:32px;border-radius:8px;border:0;background:transparent;
+  color:var(--pm-text2,#6e6e73);display:inline-flex;align-items:center;justify-content:center;padding:0;cursor:pointer;transition:background .15s,color .15s}
+.sb-toggle svg{width:20px;height:20px;pointer-events:none}
+.sb-toggle:hover{background:rgba(0,0,0,.06);color:var(--pm-text,#1d1d1f)}
+.sb-toggle:focus-visible{outline:2px solid var(--pm-accent,#0071e3);outline-offset:1px}
+body.sb-min .logo{justify-content:center;padding:14px 0 12px}
+body.sb-min .logo b{display:none}
+body.sb-min .sb-toggle{margin:0}
 </style>
 <style id="amCardCss">
 .hs-card{border:1px solid #dbe1ea;border-radius:12px;padding:14px 16px;background:#fff;
@@ -1011,8 +1023,8 @@ html.owa.dlg .overlay .modal{width:100vw!important;max-width:100vw!important;hei
 <body>
 
 <nav class="sidebar">
-  <div class="logo"><button class="sb-toggle" onclick="toggleSidebar()" title="메뉴 접기 / 펼치기">«</button>
-    <b>PANASIA</b><div>AM 영업팀<br>DASHBOARD</div></div>
+  <div class="logo"><button class="sb-toggle" onclick="toggleSidebar()" title="메뉴 접기" aria-label="메뉴 접기 / 펼치기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg></button>
+    <b>PANASIA</b></div>
   <div class="sec-label">메뉴</div>
   <div class="nav-wrap">
     <button class="nav-item active" data-page="dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>대시보드</button>
@@ -1455,7 +1467,7 @@ function toggleSidebar(on) {
   const min = on === undefined ? !document.body.classList.contains('sb-min') : !!on;
   document.body.classList.toggle('sb-min', min);
   const b = document.querySelector('.sb-toggle');
-  if (b) { b.textContent = min ? '»' : '«'; b.title = min ? '메뉴 펼치기' : '메뉴 접기'; }
+  if (b) b.title = min ? '메뉴 펼치기' : '메뉴 접기';   // 아이콘(☰)은 그대로 — 접어도 펼쳐도 같은 버튼
   try { localStorage.setItem('panasia_sb_min', min ? '1' : ''); } catch (e) {}
   fixStickyOffsets();
 }
@@ -1668,16 +1680,16 @@ function selCorr() {
     const [c, vc] = pick(v.imo, v, mailFor), [m, vm] = pick(v.imo, v, mroFor);
     return {v, c, m, vc, vm, last: [c && c[1], m && m[1]].filter(Boolean).sort().pop() || ''};
   }).sort((a, b) => (b.last > a.last ? 1 : b.last < a.last ? -1 : 0) || String(a.v.ship).localeCompare(String(b.v.ship)));
-  const cell = (x, id, kind) => x ? `<button class="mini" onclick="selCorrGo(${id}, '${kind}')">${x[0]}건 · 최근 ${esc(x[1] || '-')}</button>` : '<span class="muted sm">-</span>';
+  const cell = (x, a, b) => x ? `<button class="mini" onclick="selCorrGo(${a}, ${b})">${x[0]}건 · 최근 ${esc(x[1] || '-')}</button>` : '<span class="muted sm">-</span>';
   ovNav('listModal', 'corr', lmSave);
   $('listModal').querySelector('.modal').style.cssText = '';
   $('lTitle').textContent = `📨 교신 모아보기 (${L.length}척)`;
   $('lSub').textContent = '최근 교신한 배부터 · 건수를 누르면 그 배 메일 목록';
   $('lActions').innerHTML = `<button class="x" onclick="ovClose('listModal')">✕</button>`;
-  $('lBody').innerHTML = `${LOCAL_OK ? '<div class="corr-rec" id="corrRec"><div class="muted sm">📇 추천 수신자 모으는 중…</div></div>' : ''}<table class="tbl"><thead><tr><th>선명</th><th>프로젝트</th><th>선주사</th><th>📨 CHS 교신</th><th>📦 MRO 교신</th></tr></thead><tbody>${
+  $('lBody').innerHTML = `${LOCAL_OK ? '<div class="corr-rec" id="corrRec"><div class="muted sm">📇 추천 수신자 모으는 중…</div></div>' : ''}<table class="tbl"><thead><tr><th>선명</th><th>프로젝트</th><th>선주사</th><th>📨 교신 (CHS·MRO)</th></tr></thead><tbody>${
     L.map(({v, c, m, vc, vm}) => `<tr><td><button class="link" onclick="openVessel(${v._id})">${esc(v.ship || '')}</button></td>
       <td class="sm">${esc(voyImoOk(v) ? voyLed(v.imo).project : (v.project || '-'))}</td><td class="sm">${esc(v.owner || '-')}</td>
-      <td>${cell(c, vc._id, 'c')}</td><td>${cell(m, vm._id, 'm')}</td></tr>`).join('')}</tbody></table>`;
+      <td>${cell(corrSum(c, m), vc._id, vm._id)}</td></tr>`).join('')}</tbody></table>`;
   showOverlay('listModal');
   if (LOCAL_OK) corrRecLoad(L);
 }
@@ -1757,7 +1769,7 @@ async function corrRecLoad(L) {
 }
 let corrRecLists = [[], []];
 function corrRecCopy(btn, i) { copyText(btn, corrRecLists[i].join('; ')); }
-function selCorrGo(id, kind) { (kind === 'c' ? openMailModal : openMroMailModal)(id); }   // ✕ 를 누르면 교신 모아보기로 돌아온다
+function selCorrGo(a, b) { openCorrModal(a, b); }   // ✕ 를 누르면 교신 모아보기로 돌아온다
 function selMenuClose() { const m = $('sbMenu'); if (m) { if (m._btn) m._btn.classList.remove('on'); m.remove(); } }
 // 바 버튼 위로 펼치는 작은 메뉴 (2026-10-29) — items: [{l, r?, fn}] · 같은 버튼을 다시 누르면 닫힌다
 function selMenu(btn, head, items) {
@@ -1791,7 +1803,7 @@ function selXlsMenu(btn) {
 }
 async function selCopy() {   // 표 그대로 복사 — 엑셀·메일에 붙여넣기
   const out = exportData(selRows().rows); if (!out.length) return;
-  const H = Object.keys(out[0]), cl = x => String(x ?? '').replace(/[\t\r\n]+/g, ' ');
+  const H = [...new Set(out.flatMap(o => Object.keys(o)))], cl = x => String(x ?? '').replace(/[\t\r\n]+/g, ' ');
   const tsv = [H.join('\t'), ...out.map(o => H.map(h => cl(o[h])).join('\t'))].join('\r\n');
   const html = `<table border="1" style="border-collapse:collapse;font-size:12px"><tr>${H.map(h => `<th style="background:#f2f2f7">${esc(h)}</th>`).join('')}</tr>${
     out.map(o => `<tr>${H.map(h => `<td>${esc(cl(o[h]))}</td>`).join('')}</tr>`).join('')}</table>`;
@@ -2630,7 +2642,7 @@ function vesselFallbackHtml(id) {
   const tools = LOCAL_OK ? `<div class="v-tools">
       <button class="btn ghost" onclick="openRowEdit(${id})">✏️ 행 편집</button>
       <button class="btn ghost" onclick="openCrmModal(${id}, '')">📑 견적·수주 이력</button>
-      ${mailFor(v) ? `<button class="btn ghost" onclick="openMailModal(${id})">✉️ CHS 교신메일</button>` : ''}
+      ${(mailFor(v) || mroFor(v)) ? `<button class="btn ghost" onclick="openCorrModal(${id})">✉️ 교신메일</button>` : ''}
       ${ib && v.draw ? `<button class="btn ghost he-dwgbtn" onclick="heDwgMenu(this, '${jsq(v.draw)}', 'BWTS')">📐 도면 열기 ▾</button>` : ''}
     </div>` : '';
   return tools + '<div id="vExtra"></div>' + h;
@@ -2827,10 +2839,9 @@ function mailMenu(btn, id) {
   const row = (icon, label, sub, fn, on) =>
     `<button class="mm-item${on ? '' : ' off'}" ${on ? `onclick="closeDwgMenu();${fn}(${id})"` : 'disabled'}>
        <span class="mm-ic">${icon}</span><span><b>${label}</b><span class="mm-sub">${sub}</span></span></button>`;
+  const cm = corrSum(c, m);
   el.innerHTML =
-    row('📨', 'CHS 교신내역', c ? `${c[0]}건 · 최근 ${esc(c[1] || '-')}` : '등록된 메일 없음', 'openMailModal', !!c) +
-    row('📦', 'MRO 교신내역', m ? `${m[0]}건 · 최근 ${esc(m[1] || '-')}`
-          : (mroIndex ? '보관된 메일 없음' : '폴더 색인 준비 중'), 'openMroMailModal', !!m) +
+    row('📨', '교신내역', cm ? `${cm[0]}건 · 최근 ${esc(cm[1] || '-')}` : '교신메일 없음', 'openCorrModal', !!cm) +
     row('✉️', '재계약 알림 메일 (영문)', '아웃룩에 초안 만들기', 'openRenewalMail', true) +
     row('✉️', '재계약 알림 메일 (한글)', '아웃룩에 초안 만들기', 'openRenewalMailKo', true);
   document.body.appendChild(el);
@@ -3022,6 +3033,59 @@ function mailMetaHtml(meta) {
       ${txt('제목', meta.subject)}
     </div>
   </div>`;
+}
+
+// ── 교신내역 (2026-11-04) — CHS 등록메일 + MRO 폴더 메일을 한 표로 ──
+// [건수, 최근일] 두 개를 합친다 (메뉴·교신 모아보기 표시용)
+function corrSum(c, m) {
+  if (!c && !m) return null;
+  return [(c ? +c[0] : 0) + (m ? +m[0] : 0), [c && c[1], m && m[1]].filter(Boolean).sort().pop() || ''];
+}
+// id: 배(ALL 번호). id2: MRO 를 다른 행(같은 IMO 의 다른 탭)으로 찾을 때 — 없으면 id
+async function openCorrModal(id, id2) {
+  const v = ALL[id], vm = ALL[(id2 === undefined || id2 === null) ? id : id2] || v;
+  ovNav('listModal', 'corr1:' + (v.ship || ''), lmSave);
+  mailCtx = {...v};
+  $('listModal').querySelector('.modal').style.cssText = '';
+  $('lTitle').innerHTML = `📨 ${esc(v.ship || '')} <span class="muted sm">교신내역</span>`;
+  $('lSub').innerHTML = '';
+  $('lActions').innerHTML = `<button class="mini" onclick="crmCtx = {...mailCtx}; openCrmModal(null, '')">📑 견적·수주</button>
+    <button class="x" onclick="ovClose('listModal')">✕</button>`;
+  $('lBody').innerHTML = '<div class="empty">📨 CHS · MRO 교신메일 찾는 중…</div>';
+  showOverlay('listModal');
+  const post = (u, b) => fetch(u, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(b)})
+    .then(r => r.json()).catch(e => ({ok:false, error:e.message}));
+  const [jc, jm] = await Promise.all([
+    post('/api/chsmail/list', {ship:v.ship || '', pjt:v.project || ''}),
+    post('/api/mromail/list', {ship:vm.ship || '', pjt:vm.project || '', imo:vm.imo || ''})]);
+  mailRows = (jc && jc.ok && jc.rows) || [];
+  mroRows = (jm && jm.ok && jm.mails) || [];
+  const note = [jc && jc.ok ? '' : 'CHS 조회 실패' + (jc && jc.error ? ' (' + jc.error + ')' : ''),
+                jm && jm.ok ? (jm.building ? 'MRO 폴더 색인 준비 중 — 잠시 뒤 다시 열어 주세요' : '') : 'MRO 조회 실패' + (jm && jm.error ? ' (' + jm.error + ')' : '')]
+    .filter(Boolean);
+  const L = mailRows.map((r, i) => ({s:'c', i, d:String(r.RCV_DAY || r.CREATE_DATE || '').slice(0, 16), who:r.CREATE_ACC_NM || '', subj:mailSubject(r.FILENAME), att:''}))
+    .concat(mroRows.map((r, i) => { const f = (r.from || [])[0] || ['', '']; return {s:'m', i, d:String(r.date || '').slice(0, 16), who:f[0] || f[1] || '', subj:r.subject || '(제목 없음)', att:r.natt ? '📎' + r.natt : ''}; }))
+    .sort((a, b) => (b.d > a.d ? 1 : b.d < a.d ? -1 : 0));
+  $('lSub').innerHTML = `CHS ${mailRows.length}건 · MRO ${mroRows.length}건${note.length ? ` · <span style="color:#d70015">${esc(note.join(' · '))}</span>` : ''}`;
+  if (!L.length) { $('lBody').innerHTML = '<div class="empty">교신메일이 없습니다.</div>'; return; }
+  const tag = s => s === 'c' ? '<span class="badge b-bwts" style="font-size:10px">CHS</span>' : '<span class="badge b-sox" style="font-size:10px">MRO</span>';
+  const orig = x => x.s === 'c'
+    ? `/api/chsfile?path=${encodeURIComponent(mailRows[x.i].FILEPATH || '')}&name=${encodeURIComponent(mailRows[x.i].FILENAME || 'mail.msg')}`
+    : `/api/mromail/file?rel=${encodeURIComponent(mroRows[x.i].rel || '')}&member=${encodeURIComponent(mroRows[x.i].member || '')}`;
+  $('lBody').innerHTML = `<div class="scroll"><table class="co-tb wide mail-tb">
+    <thead><tr><th style="width:96px">날짜</th><th class="c" style="width:48px">구분</th><th style="width:140px">보낸사람·등록자</th><th>제목</th>
+      <th class="c" style="width:50px">첨부</th><th class="c" style="width:120px">열기</th></tr></thead>
+    <tbody>${L.map(x => {
+      const fn = x.s === 'c' ? 'toggleMailBody' : 'toggleMroBody';
+      return `<tr>
+        <td class="nw">${esc(x.d.slice(0, 10) || '-')}</td><td class="c">${tag(x.s)}</td>
+        <td class="nw" style="font-size:11px">${esc(x.who || '-')}</td>
+        <td class="subj" title="${esc(x.subj)}"><button class="link" onclick="${fn}(this, ${x.i})" style="text-align:left">${esc(x.subj)}</button></td>
+        <td class="c" style="font-size:11px">${x.att}</td>
+        <td class="c nw"><button class="mini" onclick="${fn}(this, ${x.i})">본문</button>
+          <a class="mini" style="text-decoration:none;display:inline-block" href="${orig(x)}" title="원본 내려받기 (아웃룩에서 열림)">원본</a></td>
+      </tr>`;
+    }).join('')}</tbody></table></div>`;
 }
 
 // ── MRO 교신내역 — 고객사 리스트 폴더(O:)에 백업된 .eml/.msg/.tar/.zip ──
@@ -3969,15 +4033,16 @@ async function copyRows(rows) {
   }
   if (ok) toast(`${rows.length}척 복사했습니다 — 엑셀이나 메일에 붙여넣으세요`); else alert('복사하지 못했습니다. 엑셀 저장을 이용해 주세요.');
 }
+// 엑셀 복사·저장 머리글은 영문 + 맨 앞 NO (2026-11-04 — 고객·해외 담당에 그대로 보내는 일이 많다)
 function exportData(rows) {
-  return rows.map(v => v._t === 'BWTS' ? {
-    '유형':v._t, 'IMO':v.imo, '선명':v.ship, '프로젝트':v.project, '선주사':v.owner, '국가':v.country, '선종':v.type, '담당자':memberOf(v),
-    'SPEC':v.spec, '도면번호':v.draw, 'PT':v.pt, 'MTR(PT)':v.mtr, 'TT':v.tt, 'TT(EX)':v.ttex, 'UVI':v.uvi, 'FMU':v.fmu,
-    '2025견적':v.e25?'Y':'', '2025수주':v.o25?'Y':'', '2025수주금액':v.a25||'', '2025실행일자':v.d25,
-    '2026견적':v.e26?'Y':'', '2026수주':v.o26?'Y':'', '2026실행일자':v.d26, '2026서비스':v.svc, '2026총수주액':v.t26||'', '컨택필요':v.need?'Y':''
+  return rows.map((v, i) => v._t === 'BWTS' ? {
+    'NO':i + 1, 'SYSTEM':v._t, 'IMO':v.imo, 'VESSEL NAME':v.ship, 'PROJECT':v.project, 'OWNER':v.owner, 'COUNTRY':v.country, 'SHIP TYPE':v.type, 'PIC':memberOf(v),
+    'SPEC':v.spec, 'DWG NO.':v.draw, 'PT':v.pt, 'MTR(PT)':v.mtr, 'TT':v.tt, 'TT(EX)':v.ttex, 'UVI':v.uvi, 'FMU':v.fmu,
+    '2025 QUOTE':v.e25?'Y':'', '2025 ORDER':v.o25?'Y':'', '2025 ORDER AMOUNT':v.a25||'', '2025 SERVICE DATE':v.d25,
+    '2026 QUOTE':v.e26?'Y':'', '2026 ORDER':v.o26?'Y':'', '2026 SERVICE DATE':v.d26, '2026 SERVICE TYPE':v.svc, '2026 TOTAL ORDER AMOUNT':v.t26||'', 'CONTACT NEEDED':v.need?'Y':''
   } : {
-    '유형':v._t, 'IMO':v.imo, '선명':v.ship, '프로젝트':v.project, '선주사':v.owner, '국가':v.country, '선종':v.type, '담당자':memberOf(v),
-    'SPEC':v.system, '도면번호':v.otp, 'TUR':v.tur, 'PaH':v.pah, '2025수주':v.o25?'Y':'', '2026견적':v.e26?'Y':'', '2026수주':v.o26?'Y':'', '계약STATUS':v.status, 'REMARK':v.remark
+    'NO':i + 1, 'SYSTEM':v._t, 'IMO':v.imo, 'VESSEL NAME':v.ship, 'PROJECT':v.project, 'OWNER':v.owner, 'COUNTRY':v.country, 'SHIP TYPE':v.type, 'PIC':memberOf(v),
+    'SPEC':v.system, 'DWG NO.':v.otp, 'TUR':v.tur, 'PaH':v.pah, '2025 ORDER':v.o25?'Y':'', '2026 QUOTE':v.e26?'Y':'', '2026 ORDER':v.o26?'Y':'', 'CONTRACT STATUS':v.status, 'REMARK':v.remark
   });
 }
 function exportExcel(rows, name) {
@@ -4001,7 +4066,7 @@ $('sFilters').addEventListener('click', e => {
 const FILTERS = {
   all: () => true, bwts: v => v._t === 'BWTS', sox: v => v._t === 'SCRUBBER',
   o25: v => v._t === 'BWTS' ? v.o25 : v.o25, e26: v => v.e26, o26: v => v.o26, need: v => v.need,
-  crm: v => !!crmFor(v), mail: v => !!mailFor(v)
+  crm: v => !!crmFor(v), mail: v => !!(mailFor(v) || mroFor(v))
 };
 const hay = v => [v.ship, v.imo, v.owner, v.project, v.type, v.country, v._cn].join(' ').toLowerCase();
 
@@ -4575,6 +4640,611 @@ async function crmOrdShow(ctx,yr,kd,mro,bd,item){
   if(mt)mt.onclick=function(){crmOrdShow(ctx,yr,kd,!mro,bd,item);};
   var it=bd.querySelector('.co-itemT');
   if(it)it.onclick=function(){crmOrdShow(ctx,yr,kd,mro,bd,item?'':(ctx.item||''));};
+}
+
+// ===== 견적 작성 (2026-11-04) — 앱 카드의 [견적 작성]과 같은 창. 앱(app.py) 코드를 그대로 옮겨 왔다 =====
+// ===== 📄 ERP 견적 PDF (2026-10-16) — e-PANASIA 에서 양식 전체복사 → 입력 → 저장 → PDF → 폴더·PDF 열기 =====
+//   e-PANASIA 조작은 창 메시지만 쓴다 — 도는 동안에도 마우스·키보드를 그대로 쓸 수 있다.
+//   Outlook 패널에서 누르면 큰 창(POP)으로 뜬다 — 패널이 닫혀도 창과 작업은 계속된다.
+var _eq={ctx:null,timer:null,cands:[],kind:'MRO',plan:null};
+function erpQuoteOpen(btn){
+  var card=btn.closest('.hs-card'); if(!card) return;
+  erpQuoteShow({ship:card.getAttribute('data-ship')||'', imo:card.getAttribute('data-imo')||'',
+                hull:card.getAttribute('data-hull')||'', owner:card.getAttribute('data-owner')||''});
+}
+function erpQuoteShow(ctx){
+  _eq.ctx=ctx||{};
+  var ov=coOverlay('eq-ov'), bd=coWin(ov,'📄','견적 작성',(ctx.ship||'')+(ctx.hull?' · '+ctx.hull:''));
+  var win=ov.querySelector('.co-win'); if(win){ win.style.maxWidth='520px'; }
+  _eq.bd=bd;
+  bd.innerHTML='<div style="padding:18px;color:#5b6675">불러오는 중…</div>';
+  fetch('/api/erp_quote/prefill',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(ctx)})
+    .then(function(r){return r.json();})
+    .then(function(j){ if(!j||!j.ok){ bd.innerHTML='<div style="padding:18px;color:#c0392b">❌ '+escapeHtml((j&&j.error)||'불러오기 실패')+'</div>'; return; }
+      erpQuoteForm(bd,j); })
+    .catch(function(e){ bd.innerHTML='<div style="padding:18px;color:#c0392b">❌ '+escapeHtml(String(e))+'</div>'; });
+}
+// 카드와 같은 글씨(Segoe UI·맑은 고딕)·같은 크기(12.5px), 항목마다 블록 (2026-10-16)
+function _eqCss(){
+  if(document.getElementById('eqCss')) return;
+  var st=document.createElement('style'); st.id='eqCss';
+  st.textContent='.eq-ov .co-bd{background:#f4f6fa;font-family:"Segoe UI","Malgun Gothic",sans-serif;font-size:12.5px;color:#1c2430}'
+   +'.eq-ov .co-bd *{font-family:inherit;font-size:12.5px}'
+   +'.eq-blk{background:#fff;border:1px solid #dbe1ea;border-radius:10px;padding:9px 12px 10px;margin:0 0 10px}'
+   +'.eq-tt{font-weight:700;color:#2b6cb0;border-bottom:1px solid #eef1f5;padding-bottom:4px;margin-bottom:7px}'
+   +'.eq-in{box-sizing:border-box;padding:5px 8px;border:1px solid #cbd6e8;border-radius:7px;background:#fff}'
+   +'.eq-tbl{border-collapse:collapse;width:100%}.eq-tbl td{padding:3px 4px;vertical-align:middle}'
+   +'.eq-k{color:#6b7686;width:110px;white-space:nowrap}'
+   +'.eq-kind{flex:1;padding:7px 0;border:1px solid #cbd6e8;background:#fff;color:#2b6cb0;border-radius:8px;font-weight:700;cursor:pointer}'
+   +'.eq-go{width:100%;padding:9px 0;border:0;border-radius:9px;background:#2b6cb0;color:#fff;font-weight:700;cursor:pointer}'
+   +'.eq-go:disabled{opacity:.6;cursor:default}'
+   +'.eq-sub{color:#6b7686}.eq-hit{padding:5px 8px;cursor:pointer;border-bottom:1px solid #eef1f5}.eq-hit:hover{background:#eef4fc}'
+   +'.eq-prog{font-family:Consolas,monospace!important}';
+  document.head.appendChild(st);
+}
+function _eqBlk(title,html,id){
+  return '<div class="eq-blk"'+(id?' id="'+id+'"':'')+'><div class="eq-tt">'+title+'</div>'+html+'</div>';
+}
+function _eqIn(id,val,w,type){
+  return '<input id="'+id+'" class="eq-in" type="'+(type||'text')+'" value="'+escapeHtml(val==null?'':String(val))+'" style="width:'+(w||'100%')+'">';
+}
+var _EQK={MRO:'#2b6cb0',REFURB:'#1e8e4e',CALIBRATION:'#7a4fc4'};   // 양식별 색
+function _eqFolderHtml(pl){
+  pl=pl||{};
+  var notes=(pl.notes||[]).map(function(n){ return '<div style="color:#b45309">· '+escapeHtml(n)+'</div>'; }).join('');
+  // 2026-10-30: 재견적은 같은 건 — 최근 건에 PO 없고 마지막 견적 90일 안이면 그 건의 01. QUOTE 에 (근거를 보여 주고 버튼으로 바꾼다)
+  var jb=pl.job, job='';
+  if(jb && !pl.manual){
+    var why='최근 건 <b>'+escapeHtml(jb.latest)+'</b> · 마지막 견적 '+escapeHtml(jb.last)+(jb.kind?' ('+escapeHtml(jb.kind)+')':'')
+      +' · '+(jb.po?'<b style="color:#1e8e4e">PO 있음</b>':'PO 없음')+(jb.days>90?' · '+jb.days+'일 지남':'');
+    var b=function(m,t){ var on=(jb.mode===m);
+      return '<button class="co-db" style="'+(on?'background:#2b6cb0;color:#fff;border-color:#2b6cb0;font-weight:700':'')+'" '
+        +'onclick="erpQuoteMode(\''+m+'\')">'+(on?'✓ ':'')+t+(jb.auto===m?' (추천)':'')+'</button>'; };
+    job='<div style="background:#f4f6fa;border-radius:8px;padding:7px 9px;margin-bottom:7px">'
+      +'<div class="eq-sub" style="margin-bottom:6px">'+why+'</div>'
+      +'<div style="display:flex;gap:6px">'+b('same','같은 건에 추가')+b('new','새 건으로')+'</div></div>';
+  }
+  return job+'<span title="'+escapeHtml(pl.folder||'')+'">'+escapeHtml(pl.tail||pl.folder||'(정하지 못함)')+'</span>'+notes;
+}
+// 폴더 계획 요청 값 — 견적 작성 창은 입력칸에서, ERP 조회의 PDF 저장 창은 열 때 정한 값
+function _eqPlanReq(){
+  if(_eq.pdfReq) return Object.assign({}, _eq.pdfReq);
+  var c=_eq.ctx||{}, V=function(id){ var e=document.getElementById(id); return e?e.value.trim():''; };
+  return {imo:c.imo||'', ship:V('eqShip')||c.ship||'', project:V('eqProject')||c.hull||'', cust_name:_eqCustName()};
+}
+function _eqApplyPlan(pl){
+  _eq.plan=pl; _eq.recPlan=pl;
+  document.getElementById('eqFolder').value=(pl||{}).folder||'';
+  document.getElementById('eqFolderTxt').innerHTML=(pl&&pl.folder)?_eqFolderHtml(pl)
+    :'<span style="color:#c77d0a">추천 폴더를 못 정했습니다 — 폴더 선택하기로 골라 주세요.</span>';
+}
+// [같은 건에 추가] / [새 건으로]
+function erpQuoteMode(m){
+  _eq.mode=m;
+  var q=_eqPlanReq(); q.mode=m;
+  fetch('/api/erp_quote/plan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(q)})
+    .then(function(r){return r.json();}).then(function(j){ if(j&&j.ok) _eqApplyPlan(j.plan); });
+}
+function _eqSensRows(s){
+  var row=function(k,v){ return '<tr><td class="eq-k">'+k+'</td><td>'+v+'</td></tr>'; };
+  return row('PT',_eqIn('eqPt',s.pt,'64px','number')+' EA &nbsp;&nbsp; 케이블 '+_eqIn('eqPtCable',s.pt_cable,'56px','number')+' m')
+    +row('TT (NON-EX)',_eqIn('eqTt',s.tt,'64px','number')+' EA')
+    +row('TT (EX)',_eqIn('eqTtex',s.ttex,'64px','number')+' EA')
+    +row('UVI',_eqIn('eqUvi',s.uvi,'64px','number')+' EA')
+    +row('FMU',_eqIn('eqFmu',s.fmu,'64px','number')+' EA');
+}
+function erpQuoteForm(bd,j){
+  _eqCss();
+  _eq.cands=j.cust||[]; _eq.plan=j.plan||null; _eq.kind='MRO'; _eq.row=j.row||{}; _eq.j=j;
+  var kinds=(j.templates||['MRO','REFURB','CALIBRATION']).map(function(t){
+    return '<button type="button" class="eq-kind" data-k="'+escapeHtml(t)+'" onclick="erpQuoteKind(this.dataset.k)">'+escapeHtml(t)+'</button>';
+  }).join('');
+  var cands=_eq.cands.slice(0,4).map(function(c,i){
+    return '<label style="display:flex;gap:7px;align-items:center;padding:3px 0;cursor:pointer">'
+      +'<input type="radio" name="eqCust" value="'+escapeHtml(c.code)+'" data-n="'+escapeHtml(c.name||'')+'"'+(i===0?' checked':'')
+      +' onchange="erpQuotePick(this.value,this.dataset.n)">'
+      +'<span>'+escapeHtml(c.name||c.code)+(c.country?' <span class="eq-sub">· '+escapeHtml(c.country)+'</span>':'')+'</span></label>';
+  }).join('');
+  var c0=_eq.cands[0]||{code:'',name:''};
+  var warn=j.erp_running?'':'<div class="eq-blk" style="background:#fff3e6;border-color:#f5c58a;color:#9a5b00">'
+      +'⚠ e-PANASIA(PLUS WIN)가 켜져 있지 않습니다. 켜고 마케팅 → 견적처리를 열어 주세요.</div>';
+  var row=function(k,v){ return '<tr><td class="eq-k">'+k+'</td><td>'+v+'</td></tr>'; };
+  var tools='<span style="float:right;font-weight:400">'
+    +'<button class="co-db" onclick="erpQuoteRowEdit()" title="관리대장 행 편집 — 센서 수량이 틀리면 여기서 고칩니다">✏️ 행 편집</button> '
+    +'<button class="co-db" onclick="erpQuoteReload()" title="관리대장 값을 다시 읽어 옵니다">↻</button></span>';
+  // 2026-10-29: 한 화면에 다 늘어놓지 않고 단계별로 (사용자 요청) — 양식 → 고객사 → 기본정보·수량 → 할인 → 저장 폴더 → 인쇄 옵션
+  //   '이미 만든 견적 → PDF만 저장' 은 📑 ERP 조회의 견적 상세로 옮겼다 — 이 창은 새 견적 만들기만
+  var step=function(n,title,html){
+    return '<div class="eq-step" data-n="'+n+'" style="display:none">'
+      +'<div class="eq-sub" style="margin:0 0 6px">'+n+' / 6</div>'+_eqBlk(title,html)+'</div>'; };
+  bd.innerHTML=warn
+    +step(1,'양식','<div style="display:flex;gap:6px">'+kinds+'</div>'
+        +'<div id="eqEngSec" style="margin-top:10px"><table class="eq-tbl">'
+        +row('엔지니어','<select id="eqEng" class="eq-in"><option value="1">1명 (1,500)</option><option value="2" selected>2명 (3,000)</option></select>')
+        +'</table></div>')
+    +step(2,'고객사', (cands||'<div style="color:#c77d0a">이 배의 고객사 기록이 없습니다 — 아래에서 찾아 고르세요.</div>')
+        +'<input type="hidden" id="eqCustCode" value="'+escapeHtml(c0.code)+'">'
+        +'<div style="margin-top:6px">'+_eqIn('eqCustQ','','100%')+'</div><div id="eqCustRes"></div>')
+    +step(3,'기본정보 · 수량'+tools,'<table class="eq-tbl">'
+        +row('선명',_eqIn('eqShip',j.ship))+row('프로젝트',_eqIn('eqProject',j.project,'180px'))
+        +row('견적자명',_eqIn('eqWriter',j.writer,'180px'))
+        +row('용량 SPEC','<span id="eqSpec">'+escapeHtml(j.spec||'-')+'</span>')
+        +'</table><table class="eq-tbl" id="eqSens">'+_eqSensRows(j.sensors||{})+'</table>'
+        +'<div class="eq-sub" style="margin-top:4px">관리대장 값 그대로면 [다음], 틀리면 여기서 고치세요.</div>')
+    +step(4,'할인','<table class="eq-tbl">'
+        +row('할인율',_eqIn('eqDcRate','','70px','number')+' %')
+        +row('문구',_eqIn('eqDcText','','100%'))+'</table>'
+        +'<div class="eq-sub" style="margin-top:4px">할인이 없으면 비워 두고 [다음]. 넣으면 Flow Meter 밑에 '
+        +'<b>** 문구 : 할인금액 USD</b> 줄을 만들고 금액 칸에 −(견적금액 × 할인율)을 넣습니다.</div>'
+        +'<div id="eqDcPrev" style="margin-top:6px;color:#9d174d"></div>')
+    +step(5,'저장 폴더','<div id="eqFolderTxt" style="margin-bottom:8px">'+_eqFolderHtml(_eq.plan)+'</div>'
+        +'<div style="display:flex;gap:6px"><button class="co-db" onclick="erpQuoteUseRec()">↺ 추천 폴더</button>'
+        +'<button class="co-db" onclick="erpQuotePickFolder()">📁 폴더 선택하기</button></div>'
+        +'<table class="eq-tbl" style="margin-top:8px">'+row('파일 이름',_eqIn('eqFile',j.file))+'</table>'
+        +'<input type="hidden" id="eqFolder" value="'+escapeHtml((_eq.plan||{}).folder||'')+'">')
+    +step(6,'인쇄 옵션','<div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">'
+        +'<label><input type="radio" name="eqRegion" value="dom"> 국내</label>'
+        +'<label><input type="radio" name="eqRegion" value="ovs" checked> 해외</label>'
+        +'<span style="color:#cbd6e8">|</span>'
+        +'<label><input type="checkbox" id="eqUnit"> 단가 인쇄</label></div>'
+        +'<div id="eqSum" class="eq-sub" style="margin-top:8px;line-height:1.6"></div>')
+    +'<div id="eqNav" style="display:flex;gap:8px;margin-top:2px">'
+    +'<button id="eqPrev" class="co-db" style="padding:9px 14px" onclick="erpQuoteStep(_eq.step-1)">◀ 이전</button>'
+    +'<button id="eqNext" class="eq-go" style="flex:1" onclick="erpQuoteStep(_eq.step+1)">다음 ▶</button>'
+    +'<button id="eqGo" class="eq-go" style="flex:1;display:none" onclick="erpQuoteGo()">📄 견적 생성하기</button></div>'
+    +'<div id="eqProg" class="eq-prog" style="display:none;margin-top:10px;background:#fff;border:1px solid #dbe1ea;border-radius:8px;padding:9px;max-height:180px;overflow:auto;white-space:pre-wrap"></div>'
+    +'<div id="eqDone"></div>';
+  _eq.recPlan=_eq.plan; _eq.step=0; _eq.mode='auto'; _eq.pdfReq=null;
+  var q=document.getElementById('eqCustQ'); q.placeholder='🔍 다른 고객사 찾기';
+  var tm=null; q.addEventListener('input',function(){ clearTimeout(tm); tm=setTimeout(erpQuoteCustSearch,250); });
+  ['eqDcRate','eqDcText'].forEach(function(id){ document.getElementById(id).addEventListener('input',_eqDcPrev); });
+  document.getElementById('eqDcText').placeholder='예: AGENT SERVICE FEE';
+  erpQuoteKind('MRO');
+  erpQuoteStep(1);
+}
+// 단계 이동 — 넘어가기 전에 그 단계 값 확인
+function erpQuoteStep(n){
+  var V=function(id){ var e=document.getElementById(id); return e?e.value.trim():''; };
+  var cur=_eq.step||0, rate=+(V('eqDcRate')||0);
+  if(n>cur){
+    if(cur===2 && !V('eqCustCode')){ toast('고객사를 골라 주세요.'); return; }
+    if(cur===4 && (rate<0 || rate>=100)){ toast('할인율은 0~100 사이로 넣어 주세요.'); return; }
+    if(cur===4 && rate>0 && !V('eqDcText')){ toast('할인 문구를 넣어 주세요.'); return; }
+    if(cur===5 && !V('eqFolder')){ toast('저장 폴더를 골라 주세요.'); return; }
+  }
+  n=Math.max(1,Math.min(6,n)); _eq.step=n;
+  document.querySelectorAll('.eq-step').forEach(function(d){ d.style.display=(+d.dataset.n===n)?'':'none'; });
+  document.getElementById('eqPrev').style.visibility=n>1?'visible':'hidden';
+  document.getElementById('eqNext').style.display=n<6?'':'none';
+  document.getElementById('eqGo').style.display=n===6?'':'none';
+  if(n===6) _eqSummary();
+}
+function _eqDcPrev(){
+  var r=+(document.getElementById('eqDcRate').value||0), t=document.getElementById('eqDcText').value.trim();
+  document.getElementById('eqDcPrev').textContent=r>0?('→ ** '+(t||'(문구)')+' : (견적금액 × '+r+'%) USD'):'';
+}
+// 마지막 단계에서 지금까지 고른 것 한눈에
+function _eqSummary(){
+  var V=function(id){ var e=document.getElementById(id); return e?e.value.trim():''; };
+  var cust=document.querySelector('input[name=eqCust]:checked'), cn=cust?(cust.dataset.n||cust.parentNode.textContent.trim()):'';
+  var r=+(V('eqDcRate')||0);
+  document.getElementById('eqSum').innerHTML=[
+    ['양식',_eq.kind+(_eq.kind==='MRO'?' · 엔지니어 '+V('eqEng')+'명':'')],
+    ['고객사',cn],['선명',V('eqShip')+(V('eqProject')?' ('+V('eqProject')+')':'')],
+    ['할인',r>0?(r+'% · '+V('eqDcText')):'없음'],
+    ['저장',((_eq.plan||{}).tail||V('eqFolder'))+' › '+V('eqFile')]
+  ].map(function(x){ return '<b>'+x[0]+'</b> '+escapeHtml(x[1]||'-'); }).join('<br>');
+}
+function _eqCustName(){
+  var c=document.querySelector('input[name=eqCust]:checked'); if(!c) return '';
+  return c.dataset.n||c.parentNode.textContent.trim();
+}
+// ① 추천 폴더로 되돌리기 (직접 고른 뒤에도)
+function erpQuoteUseRec(){
+  if(!_eq.recPlan){ toast('추천 폴더가 없습니다 — 고객사를 먼저 골라 주세요.'); return; }
+  _eq.plan=_eq.recPlan; document.getElementById('eqFolder').value=_eq.plan.folder||'';
+  document.getElementById('eqFolderTxt').innerHTML=_eqFolderHtml(_eq.plan);
+}
+function erpQuoteKind(k){
+  _eq.kind=k;
+  document.querySelectorAll('.eq-kind').forEach(function(b){
+    var c=_EQK[b.dataset.k]||'#2b6cb0', on=(b.dataset.k===k);
+    b.style.background=on?c:'#fff'; b.style.color=on?'#fff':c; b.style.borderColor=c;
+  });
+  var es=document.getElementById('eqEngSec'); if(es) es.style.display=(k==='MRO')?'':'none';
+  var go=document.getElementById('eqGo'); if(go) go.style.background=_EQK[k]||'#2b6cb0';
+  var f=document.getElementById('eqFile');
+  if(f) f.value=f.value.replace(/_BWTS MRO( [A-Z]+)?_/,'_BWTS MRO'+(k==='MRO'?'':' '+k)+'_');
+}
+// 고객사를 고르면 저장 폴더(고객사 폴더)도 다시 정한다
+function erpQuotePick(code,name){
+  document.getElementById('eqCustCode').value=code;
+  var c=_eq.ctx||{};
+  fetch('/api/erp_quote/plan',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({imo:c.imo||'',ship:document.getElementById('eqShip').value||c.ship||'',
+                         project:document.getElementById('eqProject').value||c.hull||'',cust_name:name||'',mode:_eq.mode||'auto'})})
+    .then(function(r){return r.json();}).then(function(j){
+      if(!j||!j.ok) return;
+      _eq.recPlan=j.plan;
+      if(_eq.plan && _eq.plan.manual) return;              // 폴더를 직접 골랐으면 그대로 (① 추천 폴더로 되돌릴 수 있다)
+      _eq.plan=j.plan; document.getElementById('eqFolder').value=(j.plan||{}).folder||'';
+      document.getElementById('eqFolderTxt').innerHTML=_eqFolderHtml(j.plan);
+    });
+}
+function erpQuoteCustSearch(){
+  var q=document.getElementById('eqCustQ').value.trim(), box=document.getElementById('eqCustRes');
+  if(!q){ box.innerHTML=''; return; }
+  fetch('/api/erp_quote/cust_search?q='+encodeURIComponent(q)).then(function(r){return r.json();}).then(function(j){
+    var it=(j&&j.items)||[];
+    box.innerHTML=it.length?it.slice(0,10).map(function(c){
+      return '<div class="eq-hit" data-c="'+escapeHtml(c.code)+'" data-n="'+escapeHtml(c.name)+'">'+escapeHtml(c.name)+'</div>';
+    }).join(''):'<div class="eq-sub" style="padding:5px 8px">찾는 고객사가 없습니다</div>';
+    box.querySelectorAll('.eq-hit').forEach(function(el){ el.onclick=function(){ erpQuoteSearchPick(el.dataset.c, el.dataset.n); }; });
+  });
+}
+function erpQuoteSearchPick(code,name){
+  document.querySelectorAll('input[name=eqCust]').forEach(function(r){ r.checked=false; });
+  var box=document.getElementById('eqCustRes');
+  box.innerHTML='<label style="display:flex;gap:7px;align-items:center;padding:5px 2px"><input type="radio" name="eqCust" checked> '
+    +'<span><b>'+escapeHtml(name)+'</b></span></label>';
+  document.getElementById('eqCustQ').value='';
+  erpQuotePick(code,name);
+}
+function erpQuotePickFolder(){
+  var cur=document.getElementById('eqFolder').value;
+  fetch('/api/erp_quote/pick_folder',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({start:cur})})
+    .then(function(r){return r.json();}).then(function(j){
+      if(j&&j.ok&&j.path){
+        _eq.plan={folder:j.path,actions:[],notes:['직접 고른 폴더'],tail:j.path.split(/[\\\/]/).slice(-3).join(' › '),manual:1};
+        document.getElementById('eqFolder').value=j.path;
+        document.getElementById('eqFolderTxt').innerHTML=_eqFolderHtml(_eq.plan);
+      }
+    });
+}
+// 카드의 [✏️ 행 편집] 과 같은 창 — 이 창엔 카드가 없으니 같은 정보를 단 숨은 카드로 연다
+function erpQuoteRowEdit(){
+  var c=_eq.ctx||{}, r=_eq.row||{};
+  var d=document.getElementById('eqCard');
+  if(!d){ d=document.createElement('div'); d.id='eqCard'; d.className='hs-card'; d.style.display='none'; document.body.appendChild(d); }
+  d.setAttribute('data-tab',r.tab||'BWTS'); d.setAttribute('data-order',r.order||''); d.setAttribute('data-imo',c.imo||'');
+  d.setAttribute('data-ship',c.ship||''); d.setAttribute('data-drawno',r.drawno||''); d.setAttribute('data-equip','BWTS');
+  d.innerHTML='<button></button>';
+  if(typeof hullRowEdit==='function') hullRowEdit(d.querySelector('button'));
+}
+// 관리대장 값 다시 읽기(행 편집으로 센서 수량을 고친 뒤)
+function erpQuoteReload(){
+  fetch('/api/erp_quote/prefill',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(_eq.ctx||{})})
+    .then(function(r){return r.json();}).then(function(j){
+      if(!j||!j.ok) return;
+      document.getElementById('eqSpec').textContent=j.spec||'-';
+      document.getElementById('eqSens').innerHTML=_eqSensRows(j.sensors||{});
+      toast('관리대장 값을 다시 읽었습니다');
+    });
+}
+function erpQuoteGo(){
+  var V=function(id){ var e=document.getElementById(id); return e?e.value.trim():''; };
+  var k=_eq.kind||'MRO', pl=_eq.plan||{};
+  // 2026-10-28: 견적번호를 적어 놓고 [견적 만들기]를 누르면 새 견적이 복사돼 버렸다(Q20261027016 → Q20261028078) → 번호가 있으면 막는다
+  //   2026-10-29: Outlook 창에서는 confirm() 이 안 뜰 수 있어 묻지 않고 바로 'PDF만 저장'으로 간다
+  if(V('eqRefno')){ erpQuotePrintOnly(); return; }
+  var p={template_kind:k, cust:V('eqCustCode'), ship:V('eqShip'), project:V('eqProject'), writer:V('eqWriter'),
+         engineers:(k==='MRO'?V('eqEng'):''), pt:V('eqPt'), pt_cable:V('eqPtCable'), tt:V('eqTt'), ttex:V('eqTtex'),
+         uvi:V('eqUvi'), fmu:V('eqFmu'), folder:V('eqFolder'), actions:pl.actions||[], file:V('eqFile'),
+         discount_rate:V('eqDcRate'), discount_text:V('eqDcText'),
+         // 추천 폴더면 서버가 누르는 순간 다시 계산한다(창을 연 뒤 폴더가 바뀌었을 수 있어서)
+         plan_args:pl.manual?null:{imo:(_eq.ctx||{}).imo||'', ship:V('eqShip')||(_eq.ctx||{}).ship||'',
+                   project:V('eqProject')||(_eq.ctx||{}).hull||'', cust_name:_eqCustName(), mode:_eq.mode||'auto'},
+         domestic:((document.querySelector('input[name=eqRegion]:checked')||{}).value==='dom')?1:0,
+         unit_price:(document.getElementById('eqUnit')||{}).checked?1:0};
+  if(!p.cust){ toast('고객사를 골라 주세요.'); return; }
+  if(!p.folder){ toast('저장 폴더를 골라 주세요.'); return; }
+  _eqStart(p);
+}
+// 견적번호가 적혀 있으면 아래 큰 버튼도 'PDF만 저장'으로 바뀐다 — 새 견적이 복사될 일이 없게 (2026-10-29)
+function _eqGoLabel(){
+  var go=document.getElementById('eqGo'), rf=document.getElementById('eqRefno'); if(!go||go.disabled) return;
+  var ref=rf?rf.value.trim():'';
+  go.textContent=ref?('📄 '+ref.toUpperCase()+' → PDF만 저장 (새 견적 안 만듦)'):'📄 견적 생성하기';
+}
+// 이미 만든 견적을 인쇄만 — 견적 내용은 손대지 않는다. 고객사는 보내지 않는다(ERP 쪽 고객사가 기준, 기억도 안 함)
+function erpQuotePrintOnly(){
+  var V=function(id){ var e=document.getElementById(id); return e?e.value.trim():''; };
+  var ref=V('eqRefno').toUpperCase().replace(/\s+/g,''), pl=_eq.plan||{};
+  if(!/^Q\d{11}$/.test(ref)){ toast('견적번호를 Q20261028001 처럼 넣어 주세요.'); return; }
+  if(!V('eqFolder')){ toast('저장 폴더를 골라 주세요.'); return; }
+  _eqStart({template_kind:_eq.kind||'MRO', refno:ref, from_stage:'print', ship:V('eqShip'),
+            folder:V('eqFolder'), actions:pl.actions||[], file:V('eqFile'),
+            domestic:((document.querySelector('input[name=eqRegion]:checked')||{}).value==='dom')?1:0,
+            unit_price:(document.getElementById('eqUnit')||{}).checked?1:0});
+}
+// 실제 시작(처음·이어서 하기 공통). 같은 이름 PDF 가 있으면 덮어쓸지 묻고 다시 보낸다.
+function _eqStart(p){
+  _eq.last=p;
+  var go=document.getElementById('eqGo'); go.disabled=true; go.textContent='⏳ 만드는 중…';
+  var pg=document.getElementById('eqProg'); pg.style.display=''; pg.textContent=p.from_stage?'이어서 합니다…':'시작합니다…';
+  document.getElementById('eqDone').innerHTML='';
+  fetch('/api/erp_quote/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)})
+    .then(function(r){return r.json();}).then(function(j){
+      if(j&&j.code==='exists' && !p.overwrite){
+        if(confirm((j.error||'같은 이름의 PDF 가 이미 있습니다.')+'\n\n덮어쓸까요?')){ p.overwrite=1; _eqStart(p); return; }
+      }
+      if(!j||!j.ok){ pg.textContent='❌ '+((j&&j.error)||'시작 실패'); go.disabled=false; go.textContent='📄 견적 만들기'; _eqGoLabel(); return; }
+      clearInterval(_eq.timer); _eq.timer=setInterval(erpQuotePoll,1000);
+    });
+}
+// 이어서 하기 — 같은 견적번호로 그 단계부터 (전체복사는 다시 안 함, 폴더도 이미 만들어졌으니 그대로)
+var _EQSTG={detail:'견적서상세',desc:'Description',discount:'할인',print:'PDF'};
+function erpQuoteResume(stage){
+  var r=_eq.lastResult||{}, p=Object.assign({}, _eq.last||{});
+  if(!r.refno){ toast('이어서 할 견적번호가 없습니다.'); return; }
+  p.refno=r.refno; p.from_stage=stage; p.actions=[]; p.overwrite=1;   // 같은 이름 그대로(새로 _2 를 만들지 않게)
+  if(r.out){ var i=r.out.lastIndexOf('\\'); p.folder=r.out.slice(0,i); p.file=r.out.slice(i+1); }
+  _eqStart(p);
+}
+function erpQuotePoll(){
+  fetch('/api/erp_quote/status').then(function(r){return r.json();}).then(function(j){
+    var pg=document.getElementById('eqProg'), go=document.getElementById('eqGo');
+    if(!pg){ clearInterval(_eq.timer); return; }
+    pg.textContent=(j.log||[]).join('\n')+(j.running?'\n⏳ '+j.elapsed+'초…':'');
+    pg.scrollTop=pg.scrollHeight;
+    if(j.running) return;
+    clearInterval(_eq.timer);
+    var r=j.result||{}; _eq.lastResult=r;
+    go.disabled=false; go.textContent='📄 견적 만들기'; _eqGoLabel();
+    var warns=(r.warns||[]).map(function(w){return '<div style="color:#b45309">⚠ '+escapeHtml(w)+'</div>';}).join('');
+    var done=document.getElementById('eqDone'); done.style.marginTop='10px';
+    if(r.ok){
+      pg.style.display='none';
+      done.innerHTML='<div style="font-weight:700;color:#1e8e4e">✅ '+escapeHtml(r.refno||'')+' 견적 PDF 완료 ('+r.secs+'초)</div>'+warns
+        +'<div style="margin-top:8px;display:flex;gap:8px">'
+        +'<button class="co-dbtn" onclick="erpQuoteOpenPath(\''+encodeURIComponent(r.out)+'\',0)">📂 폴더 열기</button>'
+        +'<button class="co-dbtn" onclick="erpQuoteOpenPath(\''+encodeURIComponent(r.out)+'\',1)">📄 PDF 열기</button></div>';
+      toast('✅ 견적 PDF 완료 — '+(r.refno||''));
+    }else{
+      var stg=r.stage||'copy'; if(stg==='copy' && r.refno) stg='detail';   // 복사는 됐는데 그 뒤에서 멈춤
+      var resume='';
+      if(r.refno){
+        resume='<div class="eq-blk" style="margin-top:8px">'
+          +'<div style="margin-bottom:6px">e-PANASIA 에서 <b>'+escapeHtml(r.refno)+'</b> 를 직접 고치고 <b>저장</b>한 뒤 이어서 하세요.</div>'
+          +'<button class="eq-go" style="background:'+(_EQK[_eq.kind]||'#2b6cb0')+'" onclick="erpQuoteResume(\''+stg+'\')">▶ 이어서 하기 ('+_EQSTG[stg]+'부터)</button>'
+          +'<div style="margin-top:6px;display:flex;gap:6px;justify-content:center">'
+          +['detail','desc','discount','print'].filter(function(s){
+             return s!==stg && (s!=='discount' || +((_eq.last||{}).discount_rate||0)>0); }).map(function(s){
+             return '<button class="co-db" onclick="erpQuoteResume(\''+s+'\')">'+_EQSTG[s]+(s==='print'?'만':'부터')+'</button>'; }).join('')
+          +'</div></div>';
+      }
+      done.innerHTML='<div style="font-weight:700;color:#c0392b">❌ 멈춤 ('+escapeHtml(_EQSTG[r.stage]||'전체복사')+'): '+escapeHtml(r.error||'')+'</div>'+warns
+        +(r.refno?'':'<div class="eq-sub" style="margin-top:4px">새 견적은 만들어지지 않았습니다 — 고친 뒤 [견적 만들기]를 다시 누르세요.</div>')
+        +resume;
+    }
+  });
+}
+fetch('/api/erp_quote/status').then(function(r){return r.json();}).then(function(j){ window._eqOn=!!(j&&j.on); }).catch(function(){});
+// 📑 견적 상세 → [PDF 저장] (2026-10-29, 2026-11-04 카드 순서식으로 개편) — 이미 만든 견적을 인쇄만 해서 고객사 폴더에
+//   한 화면에 칸이 많아 뭘 누를지 몰랐다(사용자) → 한 장씩: ① 저장 폴더 → ② 파일 이름 → ③ 인쇄 옵션 → 저장.
+//   견적 내용은 손대지 않는다(전체복사·입력·저장 없음). 견적번호·선명은 창 제목에 있으니 따로 안 보인다.
+var _pdw={};
+function _pdwCss(){
+  if(document.getElementById('pdwCss')) return;
+  var st=document.createElement('style'); st.id='pdwCss';
+  var F='font-family:"Malgun Gothic","맑은 고딕","Segoe UI",sans-serif;';
+  st.textContent='.pdw-ov .co-win{max-width:520px}html.pop .co-ov.pop-float.pdw-ov>.co-win{width:540px!important;min-height:440px}'
+   +'.pdw-ov .co-bd{background:#f4f6fa;'+F+'font-size:13px;color:#1c2430;padding:14px 16px 18px}'
+   +'.pdw-ov .co-bd *{'+F+'}'
+   +'.pdw-steps{display:flex;gap:6px;margin:0 0 12px}'
+   +'.pdw-steps span{flex:1;text-align:center;font-size:11.5px;color:#94a3b8;border-bottom:3px solid #e2e8f0;padding-bottom:5px}'
+   +'.pdw-steps span.on{color:#9d174d;border-color:#9d174d;font-weight:700}.pdw-steps span.done{color:#64748b;border-color:#cbd5e1}'
+   +'.pdw-card{background:#fff;border:1px solid #dbe1ea;border-radius:12px;padding:16px 16px 14px}'
+   +'.pdw-q{font-size:15px;font-weight:800;margin:0 0 12px}'
+   +'.pdw-opt{display:block;width:100%;text-align:left;border:1.5px solid #dbe1ea;background:#fff;border-radius:10px;padding:11px 13px;margin:0 0 8px;cursor:pointer}'
+   +'.pdw-opt:hover{border-color:#9d174d;background:#fdf2f8}'
+   +'.pdw-opt.main{border-color:#9d174d}'
+   +'.pdw-opt b{display:block;font-size:13.5px;margin-bottom:3px}'
+   +'.pdw-opt small{display:block;color:#64748b;font-size:12px;line-height:1.45}'
+   +'.pdw-in{box-sizing:border-box;width:100%;padding:8px 10px;border:1px solid #cbd6e8;border-radius:8px;font-size:13px;margin:4px 0 8px}'
+   +'.pdw-in:focus{outline:0;border-color:#9d174d}'
+   // 이전·다음·저장 = 같은 양식 같은 크기 (2026-11-04 사용자: 이전 버튼이 글자만이라 뜬금없었다)
+   +'.pdw-nav{display:flex;gap:6px;align-items:center;margin-top:12px}'
+   +'.pdw-nav .pb{min-width:76px;padding:7px 16px;font-size:12.5px}.pdw-nav .pb.next{margin-left:auto}'
+   +'.pdw-seg{display:flex;gap:8px;margin:0 0 10px}'
+   +'.pdw-seg button{flex:1;padding:10px 0;border:1.5px solid #dbe1ea;background:#fff;border-radius:9px;cursor:pointer;font-weight:700;color:#475569}'
+   +'.pdw-seg button.on{border-color:#f3c0da;background:#fce7f3;color:#9d174d}'
+   +'.pdw-lab{font-size:12px;color:#64748b;margin:0 0 6px}'
+   +'.pdw-err{color:#b91c1c;font-size:12px;margin:-2px 0 6px}'
+   +'.pdw-log{margin-top:10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px;max-height:130px;overflow:auto;white-space:pre-wrap;font-size:11.5px;color:#64748b}';
+  document.head.appendChild(st);
+}
+// 추천 폴더 짧게: '…\고객사\선명_호선_IMO_담당\2026\01. QUOTE' → '선명 › 2026 › 01. QUOTE'
+function _pdwShort(path){
+  var p=String(path||'').split(/[\\\/]/).filter(function(x){ return x; });
+  if(p.length>=3 && /^(19|20)\d{2}$/.test(p[p.length-2])) return [p[p.length-3].split('_')[0], p[p.length-2], p[p.length-1]].join(' › ');
+  return p.slice(-3).join(' › ');
+}
+// 추천 폴더 미리 찾기 — 견적 상세를 열 때 시작해 둔다(폴더 계획만 세움, 폴더를 만들지는 않는다: erp_quote.plan_folder)
+var _pdwPre={};
+function _pdwReq(ds){ return {imo:'', ship:ds.ship||'', project:ds.project||'', cust_name:ds.cust||''}; }
+function _pdwFetchPlan(req, m){
+  return fetch('/api/erp_quote/plan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.assign({},req,{mode:m}))})
+    .then(function(r){return r.json();}).then(function(j){ return (j&&j.ok&&j.plan)||null; }).catch(function(){ return null; });
+}
+function _pdwPrefetch(ds){
+  var k=ds.refno; if(!k || _pdwPre[k]) return;
+  var p=_pdwPre[k]=_pdwFetchPlan(_pdwReq(ds),'auto');
+  p.then(function(pl){ if(!pl && _pdwPre[k]===p) delete _pdwPre[k]; });   // 실패면 다음에 다시
+}
+function erpQuotePdfShow(ds){
+  _pdwCss(); _pbCss();
+  var ref=ds.refno||'', ship=ds.ship||'', t=String(ds.title||'').toUpperCase();
+  var kind=/CALIBRATION/.test(t)&&!/REFURB/.test(t)?'CALIBRATION':(/REFURB/.test(t)?'REFURB':'MRO');
+  var d=new Date(), ymd=d.getFullYear()+('0'+(d.getMonth()+1)).slice(-2)+('0'+d.getDate()).slice(-2);
+  var ov=coOverlay('pdw-ov'), bd=coWin(ov,'','PDF 저장',ref+(ship?' · '+ship:''));
+  if(window.POP_MODE) ov.classList.add('pop-float');   // 큰 창 안에서는 가운데 작은 창으로
+  _pdw={ds:ds, ref:ref, ship:ship, kind:kind, ov:ov, bd:bd, step:1, mode:'auto', plan:null, folder:'', actions:[],
+        manual:0, file:'[QUOTE] '+ship.trim().toUpperCase()+'_BWTS MRO'+(kind==='MRO'?'':' '+kind)+'_'+ymd+'.pdf',
+        dom:0, unit:0, req:_pdwReq(ds)};
+  _pdwStep1();
+  _pdwPlan('auto');
+}
+function _pdwFrame(n, html){
+  var names=['저장 폴더','파일 이름','인쇄 옵션'];
+  _pdw.step=n;
+  _pdw.bd.innerHTML='<div class="pdw-steps">'+names.map(function(x,i){
+      return '<span class="'+(i+1===n?'on':(i+1<n?'done':''))+'">'+(i+1)+'. '+x+'</span>'; }).join('')+'</div>'
+    +'<div class="pdw-card">'+html+'</div>';
+}
+function _pdwPlan(m){
+  _pdw.mode=m; _pdw.planDone=0;
+  var me=_pdw, pre=(m==='auto')&&_pdwPre[me.ref];
+  (pre||_pdwFetchPlan(me.req,m)).then(function(pl){
+    if(_pdw!==me) return;                       // 그새 다른 견적 창을 열었다
+    me.plan=pl; me.planDone=1;                  // 실패해도 '찾는 중'에 멈춰 있지 않게
+    if(me.step===1 && !me.typing) _pdwStep1();
+  });
+}
+// ① 저장 폴더 — 추천 폴더 / 주소 직접 입력
+function _pdwStep1(){
+  _pdw.typing=0;
+  var pl=_pdw.plan, rec;
+  if(pl && pl.folder){
+    var jb=pl.job, sw='';
+    if(jb && !pl.manual){   // 같은 건(최근 건 폴더) / 새 건 — 작은 글자로만
+      sw='<small style="margin-top:4px">'+(_pdw.mode==='new'||jb.mode==='new'?'새 건 폴더로 만듭니다':'최근 건('+escapeHtml(jb.latest)+')에 함께 둡니다')
+        +' · <a href="#" onclick="event.preventDefault();event.stopPropagation();_pdwPlan(\''+((jb.mode==='new')?'same':'new')+'\')">'
+        +((jb.mode==='new')?'최근 건에 두기':'새 건으로 바꾸기')+'</a></small>';
+    }
+    rec='<button class="pdw-opt main" onclick="_pdwUseRec()" title="'+escapeHtml(pl.folder)+'">'
+      +'<b>📁 '+escapeHtml(_pdwShort(pl.folder))+'</b>'
+      +'<small>추천 폴더 · '+escapeHtml(_pdw.ds.cust||'')+'</small>'+sw+'</button>';
+  }else{
+    rec='<div class="pdw-opt" style="cursor:default;color:#64748b">'+(!_pdw.planDone?'추천 폴더를 찾는 중…':'추천 폴더를 정하지 못했습니다 — 주소를 직접 넣어 주세요')+'</div>';
+  }
+  _pdwFrame(1,'<div class="pdw-q">어디에 저장할까요?</div>'+rec
+    +'<button class="pdw-opt" onclick="_pdwType()"><b>⌨ 주소 직접 입력</b><small>탐색기 주소창의 폴더 주소를 붙여 넣으세요</small></button>');
+}
+function _pdwUseRec(){
+  var pl=_pdw.plan||{}; if(!pl.folder) return;
+  _pdw.folder=pl.folder; _pdw.actions=pl.actions||[]; _pdw.manual=0;
+  _pdwStep2();
+}
+function _pdwType(){
+  _pdw.typing=1;
+  _pdwFrame(1,'<div class="pdw-q">저장할 폴더 주소</div>'
+    +'<input id="pdwDir" class="pdw-in" placeholder="예) O:\\AM사업본부\\…\\2026\\01. QUOTE" value="'+escapeHtml(_pdw.manual?_pdw.folder:'')+'">'
+    +'<div id="pdwDirErr" class="pdw-err"></div>'
+    +'<div class="pdw-nav"><button class="pb gray" onclick="_pdwStep1()">이전</button>'
+    +'<button class="pb pink next" onclick="_pdwTypeOk()">다음</button></div>');
+  var e=document.getElementById('pdwDir'); e.focus();
+  e.onkeydown=function(ev){ if(ev.key==='Enter'){ ev.preventDefault(); _pdwTypeOk(); } };
+}
+function _pdwTypeOk(){
+  var v=document.getElementById('pdwDir').value.trim().replace(/^"+|"+$/g,'').replace(/[\\\/]+$/,'');
+  var err=document.getElementById('pdwDirErr');
+  if(!v){ err.textContent='폴더 주소를 넣어 주세요.'; return; }
+  fetch('/api/erp_quote/check_folder',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:v})})
+    .then(function(r){return r.json();}).then(function(j){
+      if(!j||!j.ok||!j.exists){ err.textContent='그 폴더가 없습니다 — 주소를 확인해 주세요.'; return; }
+      _pdw.folder=j.path||v; _pdw.actions=[]; _pdw.manual=1; _pdwStep2();
+    }).catch(function(e){ err.textContent=''+e; });
+}
+// ② 파일 이름 — 추천 이름이 처음부터 입력칸에 (누르면 바로 고친다) → [다음] (2026-11-04 사용자 지정)
+function _pdwStep2(){
+  _pdwFrame(2,'<div class="pdw-q">파일 이름</div>'
+    +'<input id="pdwFile" class="pdw-in" value="'+escapeHtml(_pdw.file)+'" spellcheck="false">'
+    +'<div class="pdw-lab">📁 '+escapeHtml(_pdwShort(_pdw.folder))+'</div>'
+    +'<div class="pdw-nav"><button class="pb gray" onclick="_pdwStep1()">이전</button>'
+    +'<button class="pb pink next" onclick="_pdwFileOk()">다음</button></div>');
+  var e=document.getElementById('pdwFile');
+  e.onkeydown=function(ev){ if(ev.key==='Enter'){ ev.preventDefault(); _pdwFileOk(); } };
+}
+function _pdwFileOk(){
+  var v=document.getElementById('pdwFile').value.trim().replace(/[\\\/:*?"<>|]/g,'_');
+  if(!v){ toast('파일 이름을 넣어 주세요.'); return; }
+  if(!/\.pdf$/i.test(v)) v+='.pdf';
+  _pdw.file=v; _pdwStep3();
+}
+// ③ 인쇄 옵션 → 저장
+function _pdwStep3(){
+  var seg=function(k,a,b){ return '<div class="pdw-seg">'
+    +'<button class="'+(_pdw[k]?'':'on')+'" onclick="_pdw.'+k+'=0;_pdwStep3()">'+a+'</button>'
+    +'<button class="'+(_pdw[k]?'on':'')+'" onclick="_pdw.'+k+'=1;_pdwStep3()">'+b+'</button></div>'; };
+  _pdwFrame(3,'<div class="pdw-q">인쇄 옵션</div>'
+    +seg('dom','해외','국내')+seg('unit','단가 숨김','단가 인쇄')
+    +'<div class="pdw-nav"><button class="pb gray pdw-back" onclick="_pdwStep2()">이전</button>'
+    +'<button id="pdwGo" class="pb pink next" onclick="_pdwGo()">PDF 저장하기</button></div>'
+    +'<div id="pdwLog" class="pdw-log" style="display:none"></div>');
+}
+function _pdwGo(over){
+  var go=document.getElementById('pdwGo'), lg=document.getElementById('pdwLog');
+  go.disabled=true; go.textContent='저장 중… (약 30초)'; lg.style.display=''; lg.textContent='e-PANASIA 에서 인쇄합니다…';
+  document.querySelectorAll('.pdw-ov .pdw-seg button,.pdw-ov .pdw-back').forEach(function(b){ b.disabled=true; });
+  var p={template_kind:_pdw.kind, refno:_pdw.ref, from_stage:'print', ship:_pdw.ship, folder:_pdw.folder,
+         actions:_pdw.actions||[], file:_pdw.file, domestic:_pdw.dom, unit_price:_pdw.unit, overwrite:over?1:0};
+  fetch('/api/erp_quote/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)})
+    .then(function(r){return r.json();}).then(function(j){
+      if(j&&j.code==='exists' && !over){
+        _deAsk((j.error||'같은 이름의 PDF 가 이미 있습니다.')+'\n\n덮어쓸까요?','덮어쓰기',function(){ _pdwGo(1); }, _pdw.ov);
+        go.disabled=false; go.textContent='PDF 저장하기'; return;
+      }
+      if(!j||!j.ok){ lg.textContent='❌ '+((j&&j.error)||'시작 실패'); go.disabled=false; go.textContent='PDF 저장하기'; return; }
+      clearInterval(_pdw.timer); _pdw.timer=setInterval(_pdwPoll,1000);
+    }).catch(function(e){ lg.textContent='❌ '+e; go.disabled=false; go.textContent='PDF 저장하기'; });
+}
+function _pdwPoll(){
+  fetch('/api/erp_quote/status').then(function(r){return r.json();}).then(function(j){
+    var lg=document.getElementById('pdwLog');
+    if(!lg){ clearInterval(_pdw.timer); return; }
+    lg.textContent=(j.log||[]).join('\n')+(j.running?'\n⏳ '+j.elapsed+'초…':''); lg.scrollTop=lg.scrollHeight;
+    if(j.running) return;
+    clearInterval(_pdw.timer);
+    var r=j.result||{};
+    // 끝 알림은 서버가 모니터 한가운데 창으로 띄운다(erp_quote.notify) — 여기선 결과 카드만
+    if(r.ok){
+      // 완료 창은 Windows 알림 하나만 — [폴더 열기][PDF 열기][확인] 이 거기 있다(erp_quote.notify).
+      //   앱 쪽 결과 창까지 떠서 둘 다 닫아야 했다(2026-11-04 사용자) → 이 창은 스스로 닫는다
+      if(_pdw.ov) _pdw.ov.remove();
+      toast('✅ PDF 저장 완료 — '+((r.out||'').split(/[\\\/]/).pop()));
+    }else{
+      var go=document.getElementById('pdwGo'); if(go){ go.disabled=false; go.textContent='다시 저장하기'; }
+      document.querySelectorAll('.pdw-ov .pdw-seg button,.pdw-ov .pdw-back').forEach(function(b){ b.disabled=false; });
+      lg.textContent='❌ 멈춤: '+(r.error||'')+'\n\n'+lg.textContent;
+    }
+  });
+}
+function erpQuoteOpenPath(enc,file){
+  fetch('/api/erp_quote/open',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({path:decodeURIComponent(enc),file:file?1:0})});
+}
+if(typeof _de==='undefined') var _de={};
+function _pbCss(){
+  if(document.getElementById('pbCss')) return;
+  var st=document.createElement('style'); st.id='pbCss';
+  st.textContent='.pb{font-size:11.5px;font-weight:700;line-height:1.4;border:1px solid;border-radius:7px;padding:5px 12px;'
+   +'cursor:pointer;white-space:nowrap;margin:0;flex:none}'
+   +'.pb:disabled{opacity:.5;cursor:default}'
+   +'.pb.blue{color:#1e4f91;background:#e3eefc;border-color:#b9d0ef}.pb.blue:hover:not(:disabled){background:#d3e4fa}'
+   +'.pb.pink{color:#9d174d;background:#fce7f3;border-color:#f3c0da}.pb.pink:hover:not(:disabled){background:#fad5e9}'
+   +'.pb.green{color:#166534;background:#dcfce7;border-color:#a7dcb9}.pb.green:hover:not(:disabled){background:#c8f5d6}'
+   +'.pb.teal{color:#0f5f58;background:#d8f3ee;border-color:#a6dcd3}.pb.teal:hover:not(:disabled){background:#c4ece5}'
+   +'.pb.gray{color:#5b6675;background:#f2f4f8;border-color:#d9dfe8}.pb.gray:hover:not(:disabled){background:#e6eaf1}'
+   // 창 머리 버튼 묶음 — 버튼 사이 6px (예전엔 머리 gap 10px + 여백이 겹쳐 넓었다)
+   +'.co-hbtns{margin-left:auto;display:flex;gap:6px;align-items:center;flex:none}.co-hbtns .co-x{margin-left:0}';
+  document.head.appendChild(st);
+}
+function _deAsk(msg, yesLabel, onYes, ov){
+  var host=((ov||_de.ov)&&(ov||_de.ov).querySelector('.co-win'))||document.body;
+  var old=host.querySelector('.de-ask'); if(old) old.remove();
+  var bx=document.createElement('div'); bx.className='de-ask';
+  bx.style.cssText='position:absolute;inset:0;background:rgba(15,23,42,.35);display:flex;align-items:center;justify-content:center;z-index:50;border-radius:inherit';
+  _pbCss();
+  bx.innerHTML='<div style="background:#fff;border-radius:12px;padding:18px 20px;min-width:280px;max-width:440px;box-shadow:0 12px 40px rgba(0,0,0,.25);color:#1c2430">'
+    +'<div style="white-space:pre-wrap;line-height:1.55;font-size:13.5px;font-weight:700">'+escapeHtml(msg)+'</div>'
+    +'<div style="display:flex;gap:6px;justify-content:flex-end;margin-top:16px">'
+    +'<button class="pb gray de-no">취소</button><button class="pb blue de-yes">'+escapeHtml(yesLabel||'확인')+'</button></div></div>';
+  if(getComputedStyle(host).position==='static') host.style.position='relative';
+  host.appendChild(bx);
+  bx.querySelector('.de-no').onclick=function(){ bx.remove(); };
+  bx.querySelector('.de-yes').onclick=function(){ bx.remove(); onYes(); };
+  bx.querySelector('.de-yes').focus();
 }
 
 async function crmDescOpen(ordnum,shipnm){
@@ -6660,23 +7330,26 @@ setTimeout(() => { if (!ERPO) loadErpOrders(false); }, 9000);   // 앱 연결 �
     var hp = Math.max(40, Math.min(95, Math.round((+d.h || 820) / ah * 100)));
     var url = location.origin + location.pathname.replace(/[^\/]*$/, '') + 'pop.html?port=' + PORT
             + '#' + encodeURIComponent(JSON.stringify({fn: d.fn, args: d.args || [], t: Date.now()}));
-    var go = function(){
+    // 2026-11-04: 이미 떠 있는 큰 창을 닫지 않고 새 창을 하나 더 띄운다(대시보드 + ERP 조회 같이 보기 — 사용자 요청).
+    //   예전엔 먼저 닫고 열어서 '창이 바뀌는' 것처럼 보였다. Outlook 이 두 번째 창을 거절할 때만 예전처럼 닫고 연다.
+    var go = function(retry){
       try{
         Office.context.ui.displayDialogAsync(url, {width: wp, height: hp, displayInIframe: false, promptBeforeOpen: false}, function(r){
           var ok = r.status === Office.AsyncResultStatus.Succeeded;
+          if(!ok && !retry && dlgApp){ try{ dlgApp.close(); }catch(e){} dlgApp = null; setTimeout(function(){ go(true); }, 300); return; }
           try{ appFrame.contentWindow.postMessage({type: 'amai-pop-result', ok: ok, id: d.id}, APP); }catch(e){}
           if(!ok) return;
-          dlgApp = r.value;
-          dlgApp.addEventHandler(Office.EventType.DialogMessageReceived, function(m){
+          var me = r.value; dlgApp = me;
+          me.addEventHandler(Office.EventType.DialogMessageReceived, function(m){
             var c = null; try{ c = JSON.parse(m.message); }catch(e){}
             if(c && c.compose){ owaCompose(c.compose, function(){}); return; }   // 큰 창에서 누른 메일 작성
-            try{ dlgApp.close(); }catch(e){} dlgApp = null;
+            try{ me.close(); }catch(e){} if(dlgApp === me) dlgApp = null;
           });
-          dlgApp.addEventHandler(Office.EventType.DialogEventReceived, function(){ dlgApp = null; });
+          me.addEventHandler(Office.EventType.DialogEventReceived, function(){ if(dlgApp === me) dlgApp = null; });
         });
       }catch(e){ try{ appFrame.contentWindow.postMessage({type: 'amai-pop-result', ok: false, id: d.id}, APP); }catch(e2){} }
     };
-    if(dlgApp){ try{ dlgApp.close(); }catch(e){} dlgApp = null; setTimeout(go, 300); } else go();
+    go(false);
   }
   // 연결기 켜기: amai-coordi:// (연결기 설치 때 등록) → Windows 가 화면 없이 켠다. 켜지는 동안 3초마다 붙어 본다
   document.getElementById('owaWake').onclick = function(){
