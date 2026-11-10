@@ -7131,6 +7131,22 @@ setTimeout(() => { if (!ERPO) loadErpOrders(false); }, 9000);   // 앱 연결 �
     });
   }
   // 다른 창(읽기 패널·큰 창)에서 누른 주소 → 열려 있는 작성창 패널이 받는다 (같은 github.io 끼리 BroadcastChannel)
+  // 큰 창에서 누른 메일 작성 → 지금 살아 있는 패널이 받아 연다 (2026-11-10)
+  //   예전엔 큰 창을 띄운 그 패널 하나에만 연결돼, 메일을 바꾸거나 패널이 닫히면 요청이 사라지고 '열렸습니다'만 떴다.
+  //   패널이 여럿이면(읽기·작성) 잠금을 먼저 잡은 패널 하나만 연다.
+  var composeBC = null; try{ composeBC = new BroadcastChannel('amai-compose'); }catch(e){}
+  if(composeBC) composeBC.onmessage = function(e){
+    var d = e.data || {}; if(d.type !== 'req' || DLG) return;
+    var open = function(){
+      try{ composeBC.postMessage({type: 'got', id: d.id}); }catch(x){}
+      owaCompose(d.c, function(ok, err){ try{ composeBC.postMessage({type: 'ack', id: d.id, ok: ok, error: err || ''}); }catch(x){} });
+    };
+    if(navigator.locks && navigator.locks.request){
+      navigator.locks.request('amai-compose-' + d.id, {ifAvailable: true}, function(l){
+        if(!l) return; open(); return new Promise(function(r){ setTimeout(r, 8000); });
+      });
+    } else open();
+  };
   var addrBC = null; try{ addrBC = new BroadcastChannel('amai-addr'); }catch(e){}
   if(addrBC) addrBC.onmessage = function(e){
     var d = e.data || {};

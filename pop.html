@@ -21,6 +21,13 @@
   var port = (qs.get('port') || '5174').replace(/\D/g,'') || '5174';
   var APP = 'http://127.0.0.1:' + port;
   document.getElementById('app').src = APP + '/?owa=1&pop=1' + location.hash;
+  function popHint(t){
+    var b = document.getElementById('popHint');
+    if(!b){ b = document.createElement('div'); b.id = 'popHint';
+      b.style.cssText = 'position:fixed;left:50%;bottom:76px;transform:translateX(-50%);z-index:9;background:#1d1d1f;color:#fff;padding:9px 16px;border-radius:9px;font-size:13px;box-shadow:0 6px 20px rgba(0,0,0,.3)';
+      document.body.appendChild(b); }
+    b.textContent = t; clearTimeout(b._t); b._t = setTimeout(function(){ b.remove(); }, 9000);
+  }
   // 앱 안에서 창을 모두 닫으면 이 대화상자도 닫는다
   window.addEventListener('message', function(e){
     if(e.origin !== APP || !e.data) return;
@@ -39,10 +46,23 @@
       bc.postMessage({type: 'req', id: id, addr: d.addr, kind: d.kind});
       setTimeout(function(){ if(!fin){ fin = true; bc.close(); reply({ok: false, nocompose: true}); } }, 1500);
     }
+    // 메일 작성 → 살아 있는 패널이 받아 열고 실제 결과를 돌려준다 (2026-11-10). 1초 안에 대답이 없으면 예전 길로 넘기고 안내를 띄운다
     if(e.data.type === 'amai-compose'){
-      var ok = true;
-      try{ Office.context.ui.messageParent(JSON.stringify({compose: e.data})); }catch(err){ ok = false; }
-      try{ e.source.postMessage({type: 'amai-compose-result', id: e.data.id, ok: ok, error: ok ? '' : '패널에 전달하지 못했습니다'}, APP); }catch(err){}
+      var cd = e.data, csrc = e.source, cid = 'c' + Date.now() + Math.random(), cdone = false, alive = false, cbc = null;
+      var creply = function(ok, err){ if(cdone) return; cdone = true; try{ if(cbc) cbc.close(); }catch(x){}
+        try{ csrc.postMessage({type: 'amai-compose-result', id: cd.id, ok: ok, error: err || ''}, APP); }catch(x){} };
+      var legacy = function(){ var ok = true;
+        try{ Office.context.ui.messageParent(JSON.stringify({compose: cd})); }catch(err){ ok = false; }
+        if(ok) popHint('새 메일 창이 안 뜨면 Outlook 오른쪽 AM DATA 패널을 열어 고정(📌)한 뒤 다시 눌러 주세요');
+        creply(ok, ok ? '' : '패널에 전달하지 못했습니다'); };
+      try{ cbc = new BroadcastChannel('amai-compose'); }catch(x){}
+      if(!cbc){ legacy(); return; }
+      cbc.onmessage = function(m){ var x = m.data || {}; if(x.id !== cid) return;
+        if(x.type === 'got') alive = true;
+        if(x.type === 'ack') creply(!!x.ok, x.error); };
+      cbc.postMessage({type: 'req', id: cid, c: cd});
+      setTimeout(function(){ if(!cdone && !alive) legacy(); }, 1000);
+      setTimeout(function(){ if(!cdone) creply(true, ''); }, 2500);   // 앱은 3초까지만 기다린다 — 패널이 받았으면 성공으로
     }
   });
   Office.onReady(function(){});
