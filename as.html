@@ -26,8 +26,12 @@
     const body=await new Promise(resolve=>{try{item.body.getAsync(Office.CoercionType.Text,result=>resolve(success(result)?result.value:''));}catch{resolve('');}});
     if(generation!==mailGeneration)return;
     const from=item.from||item.sender||{};
+    // Read mode only: real attachments (no inline signature images) for CHS 첨부 registration.
+    const attachments=compose?[]:Array.from(item.attachments||[]).filter(a=>a&&!a.isInline).slice(0,50)
+      .map(a=>({id:String(a.id||''),name:String(a.name||''),size:Number(a.size)||0,type:String(a.attachmentType||'file')}));
     lastMail={subject:String(subject||''),body:String(body||'').slice(0,30000),item_id:String(item.itemId||''),compose,
-              sender:from.displayName||'',sender_email:from.emailAddress||''};
+              sender:from.displayName||'',sender_email:from.emailAddress||'',attachments,
+              files:{mail:!compose&&typeof item.getAsFileAsync==='function',attachments:!compose&&typeof item.getAttachmentContentAsync==='function'}};
     sendMail();
   }
   function connect(){
@@ -56,6 +60,32 @@
       own.addEventHandler(Office.EventType.DialogEventReceived,()=>{if(dialog===own)dialog=null;});
     });}catch{reply('amai-pop-result',data.id,{ok:false});}
   }
+  // CHS 등록: export the OPEN mail (.eml) and chosen attachments for the AS panel.
+  // Only for the item the panel asked about; nothing is written to the mailbox.
+  function call(start){return new Promise(resolve=>{try{start(result=>resolve(result));}catch(error){resolve({status:'failed',error:{message:String(error&&error.message||error)}});}});}
+  function utf8Base64(text){const bytes=new TextEncoder().encode(String(text||''));let binary='';for(let i=0;i<bytes.length;i+=32768)binary+=String.fromCharCode.apply(null,bytes.subarray(i,i+32768));return btoa(binary);}
+  async function exportFiles(data){
+    let item;try{item=Office.context.mailbox.item;}catch{}
+    if(!item||String(item.itemId||'')!==String(data.item_id||'')){reply('amai-files-result',data.id,{ok:false,error:'선택한 메일이 바뀌었습니다. 메일을 다시 고른 뒤 등록해 주세요.'});return;}
+    const files=[],errors=[],failed=result=>String(result&&result.error&&result.error.message||'읽지 못했습니다.');
+    if(data.mail){
+      if(typeof item.getAsFileAsync!=='function')errors.push({name:'메일',error:'이 Outlook 버전은 메일 파일 내보내기를 지원하지 않습니다.'});
+      else{const result=await call(cb=>item.getAsFileAsync(cb));if(success(result)&&result.value)files.push({kind:'mail',name:'mail.eml',data:String(result.value)});else errors.push({name:'메일',error:failed(result)});}
+    }
+    for(const id of Array.isArray(data.attachments)?data.attachments.slice(0,50):[]){
+      const meta=Array.from(item.attachments||[]).find(a=>String(a.id)===String(id));
+      if(!meta){errors.push({name:String(id),error:'첨부파일을 찾지 못했습니다.'});continue;}
+      if(typeof item.getAttachmentContentAsync!=='function'){errors.push({name:meta.name,error:'이 Outlook 버전은 첨부파일 읽기를 지원하지 않습니다.'});continue;}
+      const result=await call(cb=>item.getAttachmentContentAsync(meta.id,cb));
+      if(!success(result)||!result.value){errors.push({name:meta.name,error:failed(result)});continue;}
+      const format=String(result.value.format||'').toLowerCase();
+      if(format==='base64')files.push({kind:'att',name:String(meta.name||'file'),data:String(result.value.content||'')});
+      else if(format==='eml')files.push({kind:'att',name:String(meta.name||'mail').replace(/\.eml$/i,'')+'.eml',data:utf8Base64(result.value.content)});
+      else if(format==='icalendar')files.push({kind:'att',name:String(meta.name||'invite').replace(/\.ics$/i,'')+'.ics',data:utf8Base64(result.value.content)});
+      else errors.push({name:meta.name,error:'OneDrive 링크 첨부는 파일이 아니라서 등록할 수 없습니다.'});
+    }
+    reply('amai-files-result',data.id,{ok:true,files,errors});
+  }
   function addRecipient(data){
     try{const item=Office.context.mailbox.item,field=data.kind==='cc'?item.cc:item.to;
       if(!field||typeof field.addAsync!=='function'){reply('amai-addr-result',data.id,{ok:false,nocompose:true});return;}
@@ -70,6 +100,7 @@
     else if(data.type==='amai-pop')openDialog(data);
     else if(data.type==='amai-compose')compose(data,(ok,error)=>reply('amai-compose-result',data.id,{ok,error}));
     else if(data.type==='amai-addr')addRecipient(data);
+    else if(data.type==='amai-files')exportFiles(data);
   });
   document.getElementById('retry').onclick=connect;
   document.getElementById('wake').onclick=()=>{window.open('amai-coordi://start','_blank');setTimeout(connect,3000);};
