@@ -12,6 +12,8 @@
   const requested=new URLSearchParams(location.search).get('port');
   const PORT=requested==='5175'?'5175':'5174', APP='http://127.0.0.1:'+PORT;
   const frame=document.getElementById('app');
+  // Bump when this page changes; the connector asks an older copy to reload itself.
+  const RELAY_VERSION=2;
   let ready=false,started=false,lastMail=null,mailGeneration=0,timer=null,hooked=false,dialog=null;
   const success=result=>result&&result.status===Office.AsyncResultStatus.Succeeded;
   function status(text){document.getElementById('connectionText').textContent=text;document.getElementById('connection').hidden=false;document.getElementById('connectionActions').hidden=false;}
@@ -30,7 +32,7 @@
     const attachments=compose?[]:Array.from(item.attachments||[]).filter(a=>a&&!a.isInline).slice(0,50)
       .map(a=>({id:String(a.id||''),name:String(a.name||''),size:Number(a.size)||0,type:String(a.attachmentType||'file')}));
     lastMail={subject:String(subject||''),body:String(body||'').slice(0,30000),item_id:String(item.itemId||''),compose,
-              sender:from.displayName||'',sender_email:from.emailAddress||'',attachments,
+              sender:from.displayName||'',sender_email:from.emailAddress||'',attachments,relay_version:RELAY_VERSION,
               files:{mail:!compose&&typeof item.getAsFileAsync==='function',attachments:!compose&&typeof item.getAttachmentContentAsync==='function'}};
     sendMail();
   }
@@ -101,6 +103,7 @@
     else if(data.type==='amai-compose')compose(data,(ok,error)=>reply('amai-compose-result',data.id,{ok,error}));
     else if(data.type==='amai-addr')addRecipient(data);
     else if(data.type==='amai-files')exportFiles(data);
+    else if(data.type==='amai-relay-reload'){const url=new URL(location.href);url.searchParams.set('v',String(Date.now()));location.replace(url.href);}
   });
   document.getElementById('retry').onclick=connect;
   document.getElementById('wake').onclick=()=>{window.open('amai-coordi://start','_blank');setTimeout(connect,3000);};
