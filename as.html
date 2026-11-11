@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AI 코디 AS · Outlook</title>
+<script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+<style>html,body{height:100%;margin:0;font:13px 'Segoe UI','Malgun Gothic',sans-serif;background:#f6f8f9;color:#2e4c57}iframe{position:fixed;inset:0;width:100%;height:100%;border:0}#connection{position:fixed;inset:0;z-index:2;display:flex;align-items:center;justify-content:center;flex-direction:column;padding:24px;box-sizing:border-box;background:#f6f8f9;text-align:center}#connection[hidden]{display:none}h1{font-size:20px;color:#087f7a}p{font-size:12px;line-height:1.8}button{padding:10px 15px;background:#087f7a;color:white;border:0;border-radius:7px;font:inherit;cursor:pointer;margin:4px}button.secondary{background:white;color:#4e6b76;border:1px solid #d4e0e4}.muted{color:#82949b;font-size:11px}</style>
+</head><body>
+<iframe id="app" title="AI 코디 AS 클레임 패널" allow="local-network-access; clipboard-write"></iframe>
+<section id="connection"><h1>AI 코디 AS</h1><p id="connectionText">PC 연결기에 연결하는 중…</p><div id="connectionActions" hidden><button id="wake">연결기 켜기</button><button id="retry" class="secondary">다시 연결</button></div><p class="muted">기존 AM DATA 연결기가 설치된 PC에서 사용할 수 있습니다.</p></section>
+<script>
+(() => {
+  'use strict';
+  const requested=new URLSearchParams(location.search).get('port');
+  const PORT=requested==='5175'?'5175':'5174', APP='http://127.0.0.1:'+PORT;
+  const frame=document.getElementById('app');
+  let ready=false,started=false,lastMail=null,mailGeneration=0,timer=null,hooked=false,dialog=null;
+  const success=result=>result&&result.status===Office.AsyncResultStatus.Succeeded;
+  function status(text){document.getElementById('connectionText').textContent=text;document.getElementById('connection').hidden=false;document.getElementById('connectionActions').hidden=false;}
+  function sendMail(){if(ready&&lastMail)frame.contentWindow.postMessage(Object.assign({type:'amai-mail'},lastMail),APP);}
+  function getValue(value){return new Promise(resolve=>{if(value&&typeof value.getAsync==='function'){try{value.getAsync(result=>resolve(success(result)?result.value:''));}catch{resolve('');}}else resolve(value||'');});}
+  async function readMail(){
+    let item;try{item=Office.context.mailbox.item;}catch{return;}
+    const generation=++mailGeneration;
+    if(!item){lastMail={subject:'',body:'',item_id:''};sendMail();return;}
+    const compose=!!(item.subject&&typeof item.subject.getAsync==='function');
+    const subject=await getValue(item.subject);
+    const body=await new Promise(resolve=>{try{item.body.getAsync(Office.CoercionType.Text,result=>resolve(success(result)?result.value:''));}catch{resolve('');}});
+    if(generation!==mailGeneration)return;
+    const from=item.from||item.sender||{};
+    lastMail={subject:String(subject||''),body:String(body||'').slice(0,30000),item_id:String(item.itemId||''),compose,
+              sender:from.displayName||'',sender_email:from.emailAddress||''};
+    sendMail();
+  }
+  function connect(){
+    ready=false;document.getElementById('connection').hidden=false;document.getElementById('connectionText').textContent='PC 연결기에 연결하는 중…';
+    clearTimeout(timer);frame.src=APP+'/as?owa=1';
+    timer=setTimeout(()=>{if(!ready)status('연결기가 꺼져 있거나 이전 버전입니다. 연결기를 켠 뒤 다시 연결해 주세요.');},8000);
+  }
+  function boot(){if(started)return;started=true;connect();}
+  function officeReady(){
+    boot();
+    try{if(!hooked){Office.context.mailbox.addHandlerAsync(Office.EventType.ItemChanged,readMail);hooked=true;}}catch{}
+    readMail();
+  }
+  function reply(type,id,data){frame.contentWindow.postMessage(Object.assign({type,id},data),APP);}
+  function compose(data,callback){
+    const recipients=value=>String(value||'').split(/[;,]/).map(v=>v.trim()).filter(Boolean);
+    const form={toRecipients:recipients(data.to),ccRecipients:recipients(data.cc),subject:String(data.subject||''),htmlBody:String(data.html||'')};
+    try{const box=Office.context.mailbox;if(box.displayNewMessageFormAsync)box.displayNewMessageFormAsync(form,result=>callback(success(result),success(result)?'':String(result.error?.message||'작성창을 열지 못했습니다.')));else{box.displayNewMessageForm(form);callback(true,'');}}catch(error){callback(false,String(error.message||error));}
+  }
+  function openDialog(data){
+    const url=new URL('pop.html',location.href);url.searchParams.set('port',PORT);url.hash=encodeURIComponent(JSON.stringify({fn:data.fn,args:data.args||[],t:Date.now()}));
+    try{Office.context.ui.displayDialogAsync(url.href,{height:90,width:85,displayInIframe:false,promptBeforeOpen:false},result=>{
+      const ok=success(result);reply('amai-pop-result',data.id,{ok});if(!ok)return;
+      dialog=result.value;const own=dialog;
+      own.addEventHandler(Office.EventType.DialogMessageReceived,event=>{let message;try{message=JSON.parse(event.message);}catch{}if(message?.compose){compose(message.compose,()=>{});return;}try{own.close();}catch{}if(dialog===own)dialog=null;});
+      own.addEventHandler(Office.EventType.DialogEventReceived,()=>{if(dialog===own)dialog=null;});
+    });}catch{reply('amai-pop-result',data.id,{ok:false});}
+  }
+  function addRecipient(data){
+    try{const item=Office.context.mailbox.item,field=data.kind==='cc'?item.cc:item.to;
+      if(!field||typeof field.addAsync!=='function'){reply('amai-addr-result',data.id,{ok:false,nocompose:true});return;}
+      const address=String(data.addr||'').trim();if(!address){reply('amai-addr-result',data.id,{ok:false});return;}
+      field.getAsync(result=>{const exists=success(result)&&(result.value||[]).some(v=>String(v.emailAddress||'').toLowerCase()===address.toLowerCase());if(exists){reply('amai-addr-result',data.id,{ok:true,dup:true});return;}field.addAsync([address],res=>reply('amai-addr-result',data.id,{ok:success(res)}));});
+    }catch{reply('amai-addr-result',data.id,{ok:false,nocompose:true});}
+  }
+  window.addEventListener('message',event=>{
+    if(event.source!==frame.contentWindow||event.origin!==APP||!event.data)return;
+    const data=event.data;
+    if(data.type==='amai-as-ready'){ready=true;clearTimeout(timer);document.getElementById('connection').hidden=true;if(lastMail)sendMail();else readMail();}
+    else if(data.type==='amai-pop')openDialog(data);
+    else if(data.type==='amai-compose')compose(data,(ok,error)=>reply('amai-compose-result',data.id,{ok,error}));
+    else if(data.type==='amai-addr')addRecipient(data);
+  });
+  document.getElementById('retry').onclick=connect;
+  document.getElementById('wake').onclick=()=>{window.open('amai-coordi://start','_blank');setTimeout(connect,3000);};
+  try{Office.onReady(officeReady);}catch{}
+  setTimeout(boot,2500);
+})();
+</script></body></html>
