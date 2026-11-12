@@ -13,7 +13,7 @@
   const PORT=requested==='5175'?'5175':'5174', APP='http://127.0.0.1:'+PORT;
   const frame=document.getElementById('app');
   // Bump when this page changes; the connector asks an older copy to reload itself.
-  const RELAY_VERSION=2;
+  const RELAY_VERSION=3;
   let ready=false,started=false,lastMail=null,mailGeneration=0,timer=null,hooked=false,dialog=null;
   const success=result=>result&&result.status===Office.AsyncResultStatus.Succeeded;
   function status(text){document.getElementById('connectionText').textContent=text;document.getElementById('connection').hidden=false;document.getElementById('connectionActions').hidden=false;}
@@ -55,7 +55,10 @@
   }
   function openDialog(data){
     const url=new URL('pop.html',location.href);url.searchParams.set('port',PORT);url.hash=encodeURIComponent(JSON.stringify({fn:data.fn,args:data.args||[],t:Date.now()}));
-    try{Office.context.ui.displayDialogAsync(url.href,{height:90,width:85,displayInIframe:false,promptBeforeOpen:false},result=>{
+    // Size asked by the panel (px) -> % of the screen; default stays 85% x 90%.
+    const pct=(px,total,fallback)=>{const v=Math.round(Number(px)/Math.max(1,Number(total)||0)*100);return v>=25&&v<=100?v:fallback;};
+    const width=pct(data.w,screen.availWidth,85),height=pct(data.h,screen.availHeight,90);
+    try{Office.context.ui.displayDialogAsync(url.href,{height,width,displayInIframe:false,promptBeforeOpen:false},result=>{
       const ok=success(result);reply('amai-pop-result',data.id,{ok});if(!ok)return;
       dialog=result.value;const own=dialog;
       own.addEventHandler(Office.EventType.DialogMessageReceived,event=>{let message;try{message=JSON.parse(event.message);}catch{}if(message?.compose){compose(message.compose,()=>{});return;}try{own.close();}catch{}if(dialog===own)dialog=null;});
