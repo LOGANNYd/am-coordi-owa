@@ -72,7 +72,9 @@ main{display:grid;grid-template-columns:300px 1fr;gap:14px;padding:14px 16px;max
 
 <div id="set" class="box">
   <div class="form">
-    <div><label>시트 '웹에 게시' 주소 (…/pub 까지)</label><input id="sPub"></div>
+    <div><label>Apps Script 웹 앱 URL (넣으면 이걸로 읽음 · …/exec)</label><input id="sGas"></div>
+    <div><label>Apps Script 열쇠 (setup 실행 로그)</label><input id="sTok" type="password"></div>
+    <div><label>또는 시트 '웹에 게시' 주소 (…/pub 까지)</label><input id="sPub"></div>
     <div><label>BWTS 탭 gid / SCRUBBER 탭 gid</label><div class="row2"><input id="sGidB"><input id="sGidS"></div></div>
     <div><label>내 영문 이름 (재계약 영문 "This is ___ from…")</label><input id="sEn"></div>
     <div><label>내 한글 이름 (발신 : ___ 프로)</label><input id="sKo"></div>
@@ -93,7 +95,8 @@ main{display:grid;grid-template-columns:300px 1fr;gap:14px;padding:14px 16px;max
 // ── 설정 ──
 // ★이 파일은 공개 GitHub Pages 에 올린다 → 시트 웹게시 주소를 파일에 넣지 않는다. 처음 한 번 ⚙ 에 붙여 넣으면 이 브라우저에 저장된다.
 //   (파일을 더블클릭해 file:// 로 열면 브라우저 보안 때문에 시트를 못 읽는다 — 웹 주소로 열어야 한다)
-const DEF = {pub: '', gidB: '695648690', gidS: '0', en: 'Logan Yun', ko: '윤석준', to: ''};
+//   Apps Script(apps_script\Code.gs) 주소·열쇠를 넣으면 웹게시 대신 그걸로 읽는다(2026-11-17).
+const DEF = {pub: '', gas: '', tok: '', gidB: '695648690', gidS: '0', en: 'Logan Yun', ko: '윤석준', to: ''};
 const SKEY = 'am_mail_light2';
 let CFG = {...DEF};
 try { Object.assign(CFG, JSON.parse(localStorage.getItem(SKEY) || '{}')); } catch (e) {}
@@ -148,24 +151,34 @@ async function loadTab(gid, t) {
   const rows = parseCSV(txt), header = rows[0] || [];
   return rows.slice(1).map((r, i) => mkRow(t, header, r, i + 2)).filter(v => v.ship && v.ship !== '-');
 }
+async function loadGas() {
+  const r = await fetch(CFG.gas + '?token=' + encodeURIComponent(CFG.tok) + '&t=' + Date.now(), {cache: 'no-store'});
+  const j = await r.json().catch(() => null);
+  if (!j || !j.ok) throw new Error('Apps Script: ' + ((j && j.error) || ('응답 오류 HTTP ' + r.status)));
+  return ['BWTS', 'SCRUBBER'].map(t => {
+    const rows = j.tabs[t] || [], header = rows[0] || [];
+    return rows.slice(1).map((r, i) => mkRow(t, header, r, i + 2)).filter(v => v.ship && v.ship !== '-');
+  });
+}
 async function load() {
   if (location.protocol === 'file:') {
     $('st').textContent = '웹 주소로 열어 주세요';
     $('res').innerHTML = '<div class="empty" style="color:#c0392b">파일을 직접 열면(file://) 브라우저 보안 때문에 시트를 읽지 못합니다.<br>GitHub 에 올린 주소로 열어 주세요.</div>';
     return;
   }
-  if (!CFG.pub) {
+  const useGas = !!(CFG.gas && CFG.tok);
+  if (!CFG.pub && !useGas) {
     $('st').textContent = '처음 설정 필요';
-    $('res').innerHTML = '<div class="empty">⚙ 설정에 시트 \'웹에 게시\' 주소를 붙여 넣고 저장하세요.</div>';
+    $('res').innerHTML = '<div class="empty">⚙ 설정에 시트 \'웹에 게시\' 주소(또는 Apps Script 주소·열쇠)를 넣고 저장하세요.</div>';
     $('setBtn').click();
     return;
   }
   $('st').textContent = '구글시트 불러오는 중…';
   try {
-    const [b, s] = await Promise.all([loadTab(CFG.gidB, 'BWTS'), loadTab(CFG.gidS, 'SCRUBBER')]);
+    const [b, s] = useGas ? await loadGas() : await Promise.all([loadTab(CFG.gidB, 'BWTS'), loadTab(CFG.gidS, 'SCRUBBER')]);
     ALL = b.concat(s);
     const d = new Date();
-    $('st').textContent = `BWTS ${b.length} · SCRUBBER ${s.length}척 · ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')} 기준`;
+    $('st').textContent = `BWTS ${b.length} · SCRUBBER ${s.length}척 · ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')} 기준 · ${useGas ? 'Apps Script' : '웹게시'}`;
     if ($('q').value.trim()) search();
     if (CUR) { const again = ALL.find(v => v._t === CUR._t && v._n === CUR._n && v.ship === CUR.ship); if (again) pick(again); }
   } catch (e) {
@@ -381,12 +394,16 @@ async function copyBody() {
 
 // ── 설정 ──
 $('setBtn').onclick = () => { const s = $('set'); s.style.display = s.style.display === 'block' ? 'none' : 'block';
+  $('sGas').value = CFG.gas || ''; $('sTok').value = CFG.tok || '';
   $('sPub').value = CFG.pub; $('sGidB').value = CFG.gidB; $('sGidS').value = CFG.gidS; $('sEn').value = CFG.en; $('sKo').value = CFG.ko; $('sTo').value = CFG.to; };
 $('setClose').onclick = () => $('set').style.display = 'none';
 $('setSave').onclick = () => {
   const pub = ($('sPub').value.trim().match(/^https:\/\/docs\.google\.com\/spreadsheets\/d\/e\/[A-Za-z0-9_-]+\/pub/) || [''])[0];
-  if (!pub) { toast('웹게시 주소 형식이 아닙니다 (…/pub)'); return; }
-  Object.assign(CFG, {pub, gidB: $('sGidB').value.trim(), gidS: $('sGidS').value.trim(), en: $('sEn').value.trim(), ko: $('sKo').value.trim(), to: $('sTo').value.trim()});
+  const gas = ($('sGas').value.trim().match(/^https:\/\/script\.google\.com\/[^\s?#]+\/exec/) || [''])[0], tok = $('sTok').value.trim();
+  if ($('sGas').value.trim() && !gas) { toast('Apps Script 주소 형식이 아닙니다 (https://script.google.com/…/exec)'); return; }
+  if (gas && !tok) { toast('Apps Script 열쇠를 넣어 주세요'); return; }
+  if (!pub && !gas) { toast('웹게시 주소(…/pub) 또는 Apps Script 주소를 넣어 주세요'); return; }
+  Object.assign(CFG, {pub, gas, tok, gidB: $('sGidB').value.trim(), gidS: $('sGidS').value.trim(), en: $('sEn').value.trim(), ko: $('sKo').value.trim(), to: $('sTo').value.trim()});
   saveCfg(); $('set').style.display = 'none'; toast('저장했습니다'); load(); if (CUR) render();
 };
 
