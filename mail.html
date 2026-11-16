@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AM 메일 양식</title>
+<!--
+  AM 메일 양식 (Light 2, 2026-11-17)
+  · 프로그램 설치 없이 이 파일 하나를 브라우저로 연다.
+  · AM 관리대장(구글시트) '웹에 게시' CSV 를 읽는다 — 읽기만 한다(시트 수정은 구글시트에서).
+  · 선명/IMO/프로젝트 검색 → 양식 선택 → 빈칸 입력 → [본문 복사] → 아웃룩 전달·새 메일 창에 Ctrl+V.
+  · CHS·ERP·CRM 은 쓰지 않는다.
+-->
+<style>
+:root{--bg:#f4f6f9;--card:#fff;--line:#dfe4ec;--txt:#1c2430;--mut:#6b7686;--pri:#5030e5;--pri2:#4325c4;--ok:#1e8e4e}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);font:13px/1.5 "Segoe UI","Malgun Gothic",sans-serif}
+header{position:sticky;top:0;z-index:5;background:#fff;border-bottom:1px solid var(--line);padding:10px 16px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+header h1{font-size:15px;margin:0 10px 0 0;white-space:nowrap}
+#q{flex:1;min-width:220px;height:32px;border:1px solid #cdd3de;border-radius:6px;padding:0 12px;font:inherit}
+#q:focus{outline:none;border-color:#7c8cf8;box-shadow:0 0 0 3px rgba(91,108,240,.15)}
+.btn{height:32px;padding:0 12px;border:1px solid var(--pri2);background:var(--pri);color:#fff;border-radius:6px;font:inherit;font-weight:600;cursor:pointer;white-space:nowrap}
+.btn.gray{background:#fff;color:#4a5568;border-color:#cdd3de}
+.btn.ok{background:var(--ok);border-color:#17703d}
+.btn:disabled{opacity:.5;cursor:default}
+#st{color:var(--mut);font-size:12px;white-space:nowrap}
+main{display:grid;grid-template-columns:300px 1fr;gap:14px;padding:14px 16px;max-width:1500px;margin:0 auto}
+@media (max-width:900px){main{grid-template-columns:1fr}}
+.box{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+#res{display:flex;flex-direction:column;gap:2px;max-height:calc(100vh - 110px);overflow:auto}
+#res button{display:block;width:100%;text-align:left;border:0;background:none;padding:7px 8px;border-radius:7px;cursor:pointer;font:inherit}
+#res button:hover{background:#eef2ff}#res button.on{background:#e3e8ff}
+#res .s{font-weight:700}#res .m{display:block;color:var(--mut);font-size:11.5px}
+.tag{display:inline-block;font-size:10px;font-weight:800;border-radius:4px;padding:0 6px;margin-left:5px;vertical-align:1px}
+.tag.b{background:#e3ecfd;color:#2b6cb0}.tag.s{background:#e3f4e8;color:#2f7d46}
+.empty{color:var(--mut);padding:20px;text-align:center}
+#ship h2{font-size:17px;margin:0 0 2px}
+#ship .sub{color:var(--mut);font-size:12px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:12px 0}
+.tabs button{border:1px solid #cdd3de;background:#fff;border-radius:6px;padding:6px 12px;font:inherit;font-weight:600;cursor:pointer;color:#4a5568}
+.tabs button.on{border-color:var(--pri);background:var(--pri);color:#fff}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:14px}
+@media (max-width:1200px){.grid{grid-template-columns:1fr}}
+.form label{display:block;font-size:12px;font-weight:700;color:#3d4c63;margin:9px 0 3px}
+.form input,.form textarea,.form select{width:100%;border:1px solid #cdd3de;border-radius:6px;padding:6px 9px;font:inherit;background:#fff}
+.form textarea{min-height:52px;resize:vertical}
+.form .row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.sens{display:grid;grid-template-columns:1fr 90px 28px;gap:5px;margin-bottom:5px}
+.sens button,.mini{border:1px solid #cdd3de;background:#fff;border-radius:6px;cursor:pointer;font:inherit}
+.mini{padding:2px 9px;font-size:12px}
+.pv-h{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+.pv-h b{flex:1}
+.subj{background:#f5f7fb;border:1px solid var(--line);border-radius:6px;padding:7px 10px;margin-bottom:8px;font-weight:600;word-break:break-all}
+#pv{border:1px solid var(--line);border-radius:6px;padding:14px;background:#fff;min-height:200px;overflow:auto}
+.chk{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;margin-top:4px}
+.chk label{display:flex;gap:4px;align-items:center;font-weight:400;margin:0;color:var(--txt)}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1f2937;color:#fff;padding:8px 16px;border-radius:8px;font-size:13px;z-index:99;display:none}
+#set{display:none;margin:0 16px}
+#set .form{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:4px 14px}
+.note{color:var(--mut);font-size:11.5px;margin-top:6px}
+</style>
+</head>
+<body>
+<header>
+  <h1>✉ AM 메일 양식</h1>
+  <input id="q" placeholder="선명 · IMO · 프로젝트 · 선주사로 찾기" autocomplete="off">
+  <button class="btn" id="find">찾기</button>
+  <button class="btn gray" id="reload" title="구글시트를 다시 읽기">새로고침</button>
+  <button class="btn gray" id="setBtn" title="설정">⚙</button>
+  <span id="st">불러오는 중…</span>
+</header>
+
+<div id="set" class="box">
+  <div class="form">
+    <div><label>시트 '웹에 게시' 주소 (…/pub 까지)</label><input id="sPub"></div>
+    <div><label>BWTS 탭 gid / SCRUBBER 탭 gid</label><div class="row2"><input id="sGidB"><input id="sGidS"></div></div>
+    <div><label>내 영문 이름 (재계약 영문 "This is ___ from…")</label><input id="sEn"></div>
+    <div><label>내 한글 이름 (발신 : ___ 프로)</label><input id="sKo"></div>
+    <div><label>수주 알림 받는 사람 (복사 버튼으로 복사)</label><input id="sTo"></div>
+  </div>
+  <div style="margin-top:10px;display:flex;gap:6px"><button class="btn" id="setSave">저장</button><button class="btn gray" id="setClose">닫기</button>
+  <span class="note">이 PC 의 이 브라우저에만 저장됩니다.</span></div>
+</div>
+
+<main>
+  <div class="box"><div id="res"><div class="empty">선명을 검색하세요</div></div></div>
+  <div class="box" id="ship"><div class="empty">왼쪽에서 배를 고르면 메일 양식이 나옵니다.</div></div>
+</main>
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+// ── 설정 ──
+// ★이 파일은 공개 GitHub Pages 에 올린다 → 시트 웹게시 주소를 파일에 넣지 않는다. 처음 한 번 ⚙ 에 붙여 넣으면 이 브라우저에 저장된다.
+//   (파일을 더블클릭해 file:// 로 열면 브라우저 보안 때문에 시트를 못 읽는다 — 웹 주소로 열어야 한다)
+const DEF = {pub: '', gidB: '695648690', gidS: '0', en: 'Logan Yun', ko: '윤석준', to: ''};
+const SKEY = 'am_mail_light2';
+let CFG = {...DEF};
+try { Object.assign(CFG, JSON.parse(localStorage.getItem(SKEY) || '{}')); } catch (e) {}
+const saveCfg = () => { try { localStorage.setItem(SKEY, JSON.stringify(CFG)); } catch (e) {} };
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const ml = s => esc(s).replace(/\r\n?/g, '\n').split('\n').join('<br>');
+const nz = s => String(s || '').toUpperCase().replace(/[^A-Z0-9가-힣]/g, '');
+const toast = m => { const t = $('toast'); t.textContent = m; t.style.display = 'block'; clearTimeout(toast._t); toast._t = setTimeout(() => t.style.display = 'none', 2200); };
+
+// ── CSV ──
+function parseCSV(text) {
+  const rows = []; let row = [], cur = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) { if (c === '"') { if (text[i + 1] === '"') { cur += '"'; i++; } else q = false; } else cur += c; }
+    else if (c === '"') q = true;
+    else if (c === ',') { row.push(cur); cur = ''; }
+    else if (c === '\n') { row.push(cur); rows.push(row); row = []; cur = ''; }
+    else if (c !== '\r') cur += c;
+  }
+  if (cur || row.length) { row.push(cur); rows.push(row); }
+  return rows;
+}
+// 열 찾기 — 앱(sales_ledger)과 같은 규칙: 공백 무시 대문자, 정확일치 > 앞부분 일치(짧은 것) > 포함
+const hn = h => String(h || '').toUpperCase().replace(/\s+/g, '');
+function colOf(header, aliases) {
+  const H = header.map(hn), A = aliases.map(hn);
+  for (const a of A) { const i = H.indexOf(a); if (i >= 0) return i; }
+  for (const a of A) { const c = H.map((h, i) => [h, i]).filter(([h]) => h.startsWith(a)).sort((x, y) => x[0].length - y[0].length); if (c.length) return c[0][1]; }
+  for (const a of A) { const i = H.findIndex(h => h.includes(a)); if (i >= 0) return i; }
+  return -1;
+}
+
+let ALL = [], CUR = null, TAB = 'renew_en';
+function mkRow(t, header, r, n) {
+  const cache = {};
+  const get = (...aliases) => {
+    const k = aliases.join('|');
+    if (!(k in cache)) { const c = colOf(header, aliases); cache[k] = c >= 0 ? String(r[c] || '').trim() : ''; }
+    return cache[k];
+  };
+  return {_t: t, _n: n, get, ship: get('SHIP NAME'), imo: get('IMO'), hull: get('프로젝트', 'PROJECT', 'HULL'),
+          owner: get('SHIP OWNER'), country: get('국가'), order: get('수주번호')};
+}
+async function loadTab(gid, t) {
+  const r = await fetch(CFG.pub + '?output=csv&gid=' + encodeURIComponent(gid) + '&t=' + Date.now(), {cache: 'no-store'});
+  if (!r.ok) throw new Error(t + ' 탭 HTTP ' + r.status);
+  const txt = await r.text();
+  if (txt.trim().startsWith('<')) throw new Error(t + ' 탭을 읽지 못했습니다(웹게시 주소·gid 확인)');
+  const rows = parseCSV(txt), header = rows[0] || [];
+  return rows.slice(1).map((r, i) => mkRow(t, header, r, i + 2)).filter(v => v.ship && v.ship !== '-');
+}
+async function load() {
+  if (location.protocol === 'file:') {
+    $('st').textContent = '웹 주소로 열어 주세요';
+    $('res').innerHTML = '<div class="empty" style="color:#c0392b">파일을 직접 열면(file://) 브라우저 보안 때문에 시트를 읽지 못합니다.<br>GitHub 에 올린 주소로 열어 주세요.</div>';
+    return;
+  }
+  if (!CFG.pub) {
+    $('st').textContent = '처음 설정 필요';
+    $('res').innerHTML = '<div class="empty">⚙ 설정에 시트 \'웹에 게시\' 주소를 붙여 넣고 저장하세요.</div>';
+    $('setBtn').click();
+    return;
+  }
+  $('st').textContent = '구글시트 불러오는 중…';
+  try {
+    const [b, s] = await Promise.all([loadTab(CFG.gidB, 'BWTS'), loadTab(CFG.gidS, 'SCRUBBER')]);
+    ALL = b.concat(s);
+    const d = new Date();
+    $('st').textContent = `BWTS ${b.length} · SCRUBBER ${s.length}척 · ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')} 기준`;
+    if ($('q').value.trim()) search();
+    if (CUR) { const again = ALL.find(v => v._t === CUR._t && v._n === CUR._n && v.ship === CUR.ship); if (again) pick(again); }
+  } catch (e) {
+    $('st').textContent = '불러오기 실패';
+    $('res').innerHTML = `<div class="empty" style="color:#c0392b">${esc(e.message)}<br><br>⚙ 설정의 웹게시 주소를 확인하세요.</div>`;
+  }
+}
+
+// ── 검색 ──
+function search() {
+  const k = nz($('q').value);
+  if (k.length < 2) { $('res').innerHTML = '<div class="empty">두 글자 이상 입력하세요</div>'; return; }
+  const hit = ALL.map(v => {
+    const s = nz(v.ship), sc = s === k ? 0 : s.startsWith(k) ? 1 : s.includes(k) ? 2
+      : (nz(v.imo).includes(k) || nz(v.hull) === k) ? 3 : nz(v.hull).includes(k) ? 4 : nz(v.owner).includes(k) ? 5 : 9;
+    return [sc, v];
+  }).filter(x => x[0] < 9).sort((a, b) => a[0] - b[0] || a[1].ship.localeCompare(b[1].ship)).slice(0, 60).map(x => x[1]);
+  $('res').innerHTML = hit.length ? hit.map((v, i) => `<button data-i="${i}"><span class="s">${esc(v.ship)}</span><span class="tag ${v._t === 'BWTS' ? 'b' : 's'}">${v._t}</span>
+      <span class="m">${esc([v.hull, v.imo, v.owner].filter(Boolean).join(' · '))}</span></button>`).join('') : '<div class="empty">없음</div>';
+  $('res').querySelectorAll('button').forEach(b => b.onclick = () => {
+    $('res').querySelectorAll('button').forEach(x => x.classList.remove('on')); b.classList.add('on'); pick(hit[+b.dataset.i]);
+  });
+  if (hit.length === 1) $('res').querySelector('button').click();
+}
+
+// ── 날짜 ──
+const MON = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+function pdate(s) {
+  s = String(s || '').trim(); if (!s) return null;
+  if (/^\d{5}$/.test(s)) { const d = new Date(Date.UTC(1899, 11, 30) + (+s) * 864e5); return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()); }
+  if (/^\d{8}$/.test(s)) return new Date(+s.slice(0, 4), +s.slice(4, 6) - 1, +s.slice(6));
+  const n = s.match(/\d+/g); if (n && n.length >= 3) { let y = +n[0]; if (y < 100) y += 2000; return new Date(y, +n[1] - 1, +n[2]); }
+  return null;
+}
+// 수량이 있는 값 — 숫자가 0보다 커야 한다 (SCRUBBER in/out 칸에는 'TriOS' 같은 제조사명이 들어 있어 글자는 수량으로 보지 않는다)
+const hasQty = v => { const n = String(v || '').match(/\d+(\.\d+)?/g); return !!n && n.some(x => +x > 0); };
+
+// ── 양식 ──
+const F_EN = "font-family:Calibri,'맑은 고딕',sans-serif;font-size:11pt;color:#000000;line-height:1.4;";
+const F_KO = "font-family:'맑은 고딕','Malgun Gothic',sans-serif;font-size:10pt;color:#000000;line-height:1.5;";
+const pp = (st, t) => `<p style="${st}">${t}</p>`;
+
+function lastService(v) {
+  const raw = v.get('2026 실행일자') || v.get('2025 실행일자') || v.get('실행일자') || v.get('OTP DATE');
+  const d = pdate(raw);
+  if (d) return {last: `${MON[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`, next: `${MON[d.getMonth()]} ${d.getFullYear() + 1}`, due: d.getFullYear() + 1};
+  return {last: raw || '-', next: '-', due: new Date().getFullYear()};
+}
+function renewEN(v) {
+  const L = lastService(v), spec = v.get('SPEC (DESIGN)') || v.get('SYSTEM');
+  const P = 'margin:0;' + F_EN, B = 'margin:0 0 0 18pt;' + F_EN, N = 'margin:0 0 0 36pt;' + F_EN, blank = pp(P, '&nbsp;');
+  const items = [['Vessel Name', v.ship], ['Project No.', v.hull]].concat(spec ? [['Spec', spec]] : [], [['Last Service Date', L.last], ['Next Service Due', L.next]]);
+  const svc = ['MRO Service Includes: Health Check / Sensor Calibration / Flow Meter Validation / Operation Test / Crew Training / Certificate Issuance',
+    'Lead Time: Sensor Delivery 2 Weeks', 'Service Attendance: Upon sensor arrival onboard',
+    'Please note that new sensor purchase is not required, as calibrated sensors will be provided in advance on an exchange basis.'];
+  return {subject: `[${v.ship || 'VESSEL'}] BWTS Annual Sensor Calibration Due ${L.due} // PANASIA`,
+    html: `<div style="${F_EN}">` + pp(P, 'Dear all') + blank
+      + pp(P, `This is ${esc(CFG.en || '_____')} from the Panasia After Market Sales Team.`)
+      + pp(P, `We would like to remind you that the annual calibration for the subject vessel is now due. To ensure your continuous compliance and optimal system performance, we have attached our ${L.due} quotation for your review.`)
+      + pp(P, 'Please kindly go through the attached proposal and let us know your preferred schedule or any feedback.')
+      + pp(P, 'Should you have any questions or require further assistance, please do not hesitate to contact us. We look forward to working with you again.')
+      + blank + pp(B, '&bull; Vessel Info.') + items.map((x, i) => pp(N, `${i + 1}. ${x[0]}: ${esc(x[1])}`)).join('')
+      + blank + svc.map(s => pp(B, '&bull; ' + esc(s))).join('')
+      + blank + pp(P, 'Should you have any questions, please do not hesitate to contact us.') + blank + '</div>'};
+}
+function renewKO(v) {
+  const L = lastService(v), spec = v.get('SPEC (DESIGN)') || v.get('SYSTEM'), me = esc(CFG.ko || '_____');
+  const P = 'margin:0;' + F_KO, B = 'margin:0 0 0 18pt;' + F_KO, N = 'margin:0 0 0 36pt;' + F_KO, blank = pp(P, '&nbsp;');
+  const items = [['Vessel name :', v.ship], ['Project No.:', v.hull]].concat(spec ? [['Spec:', spec]] : [], [['Last Service Date:', L.last], ['Next Service Due:', L.next]]);
+  return {subject: `[${v.ship || 'VESSEL'}] BWTS 연간 센서 교정 안내 (${L.due}) // PANASIA`,
+    html: `<div style="${F_KO}">` + pp(P, '수신: _____') + pp(P, `발신: ${me} 프로 // 파나시아`) + blank
+      + pp(P, `업무에 노고 많으십니다. 파나시아 MRO팀 ${me} 프로입니다.`)
+      + pp(P, '귀선의 지속적인 규정 준수와 시스템의 최적 성능 유지를 위해, 연간 센서 교정 정기 점검 시기가 만료 되었음을 안내해 드립니다.')
+      + pp(P, `이와 관련하여 검토하실 수 있도록 ${L.due}년도 견적서를 첨부해 드립니다. 첨부된 제안서를 확인해 주시고, 희망하시는 일정이나 문의 사항이 있으시면 편하게 말씀해 주시기 바랍니다.`)
+      + blank + pp(P, '기타 궁금하신 점이나 도움이 필요하신 사항이 있으시면 언제든지 연락 주시기 바랍니다.')
+      + blank + pp(B, '&middot;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Vessel Info.') + items.map((x, i) => pp(N, `${i + 1}. ${x[0]} ${esc(x[1])}`)).join('')
+      + blank + pp(P, '* 한국외 지역에서 서비스 필요시 이동 및 실비가 추가될 수 있으니 서비스 필요시 회신 부탁드립니다.') + blank + '</div>'};
+}
+
+// 수주 알림 — 앱의 수주 알림 창과 같은 칸
+const SVC_OPTS = ['MRO SERVICE (2M)', 'MRO SERVICE (1M)', 'REFURB 센서만 발송', 'SENSOR CALIBRATION ONLY'];
+const svcText = (eq, o) => o === 'MRO SERVICE (2M)' ? `${eq} MRO SERVICE - 2M 1D` : o === 'MRO SERVICE (1M)' ? `${eq} MRO SERVICE - 1M 1D`
+  : o === 'REFURB 센서만 발송' ? `${eq} MRO SERVICE - REFURB 센서만 발송` : o;
+let ON = null;
+function onInit(v) {
+  const eq = v._t === 'BWTS' ? 'BWTS' : 'SCRUBBER', sens = [];
+  if (eq === 'SCRUBBER') [['TUR', 'TUR'], ['PaH', 'PaH'], ['in TUR', 'in TUR'], ['in PaH', 'in PaH'], ['out TUR', 'out TUR'], ['out PaH', 'out PaH']]
+    .forEach(([lb, h]) => { const q = v.get(h); if (hasQty(q)) sens.push([lb, q + 'EA']); });
+  else { const mtr = v.get('MTR (PT)', 'MTR(PT)');
+    [['PT', 'PT'], ['TT', 'TT'], ['TT (EX)', 'TT (EX)'], ['UVI', 'UVI'], ['FMU', 'FMU']].forEach(([lb, h]) => {
+      const q = v.get(h); if (hasQty(q)) sens.push([lb === 'PT' && mtr ? `PT (${mtr}M)` : lb, q + 'EA']); }); }
+  ON = {equip: eq, order_no: '', customer: v.owner, ship_line: v.hull ? `${v.ship} (${v.hull})` : v.ship, svc: SVC_OPTS[0],
+        service_text: svcText(eq, SVC_OPTS[0]), sensors: sens, schedule: '', agency: '', remark: '', po: '', billing: '', sales: CFG.ko || ''};
+}
+function notice(v) {
+  const d = ON, TD = 'border:1px solid #000000;padding:3px 7px;vertical-align:top;' + F_KO, TH = TD + 'background-color:#e2efda;font-weight:700;text-align:center;';
+  const P = 'margin:0;' + F_KO, blank = pp(P, '&nbsp;'), h = t => t || '&nbsp;';
+  let c4 = d.service_text ? ml(d.service_text) : '&nbsp;';
+  const rows = d.sensors.filter(r => String(r[0]).trim() && hasQty(r[1]));
+  if (rows.length) c4 += '<table style="border-collapse:collapse;margin-top:4px;">' + rows.map(r => `<tr><td style="${TD}">${esc(r[0])}</td><td style="${TD}">${esc(r[1])}</td></tr>`).join('') + '</table>';
+  const items = [['1', '수주번호', h(esc(d.order_no))], ['2', '고객사', h(esc(d.customer))], ['3', '선명', h(esc(d.ship_line))], ['4', '서비스사항', c4],
+    ['5', '본선스케줄', h(ml(d.schedule))], ['6', '대리점정보', h(ml(d.agency))], ['7', '특이사항', h(ml(d.remark))], ['8', 'PO', h(ml(d.po))], ['9', 'BILLING ADDRESS', h(ml(d.billing))]];
+  const tbl = `<table style="border-collapse:collapse;width:760px;"><tr><td style="${TH};width:44px;">NO.</td><td style="${TH};width:126px;">SUBJECT</td><td style="${TH}">CONTENTS</td></tr>`
+    + items.map(([n, s, c]) => `<tr><td style="${TD};text-align:center;">${n}</td><td style="${TD}">${s}</td><td style="${TD}">${c}</td></tr>`).join('') + '</table>';
+  const ship = v.ship, sched = (d.schedule || '').split(/\s+/).join(' ').slice(0, 80);
+  return {subject: '[MRO 수주 알림] >> ' + [ship, d.customer, d.equip, d.order_no, d.po, sched].map(x => String(x || '').trim()).filter(Boolean).join(' / '),
+    html: `<div style="${F_KO}">` + pp(P, '수신 : MRO 운영 담당자님') + pp(P, `발신 : ${esc(d.sales || '_____')} 프로 // 파나시아 MRO 팀`) + blank
+      + pp(P, '업무에 노고 많으십니다.') + pp(P, `${esc(d.equip)} MRO 수주 확인하여 아래와 같이 수주 정보 공유하여 드립니다.`)
+      + pp(P, '아래 정보 참고하시어 후속 업무 부탁드립니다.') + blank + tbl + blank + '</div>'};
+}
+
+// 선박 정보 표 — 시트 내용을 메일(전달 등)에 붙일 때
+const INFO_B = [['선명', ['SHIP NAME']], ['프로젝트', ['프로젝트', 'PROJECT', 'HULL']], ['IMO', ['IMO']], ['선종', ["SHIP'S TYPE", 'SHIP TYPE', '선종']],
+  ['선주사', ['SHIP OWNER']], ['국가', ['국가']], ['SPEC', ['SPEC (DESIGN)']], ['PT', ['PT']], ['PT 미터', ['MTR (PT)', 'MTR(PT)']], ['TT', ['TT']], ['TT (EX)', ['TT (EX)']],
+  ['UVI', ['UVI']], ['FMU', ['FMU']], ['UV LAMP', ['UV LAMP']], ['도면번호', ['DRAW NO']], ['2025 실행일자', ['2025 실행일자']], ['2026 실행일자', ['2026 실행일자']],
+  ['SERVICE 형태', ['SERVICE 형태']], ['수주번호', ['수주번호']], ['REMARK', ['REMARK']]];
+const INFO_S = [['선명', ['SHIP NAME']], ['프로젝트', ['PROJECT (HULL NO.)', 'PROJECT', 'HULL']], ['IMO', ['IMO']], ['선종', ["SHIP'S TYPE", 'SHIP TYPE']],
+  ['선주사', ['SHIP OWNER']], ['국가', ['국가']], ['SYSTEM', ['SYSTEM']], ['TUR', ['TUR']], ['PaH', ['PaH']], ['in TUR / in PaH', ['in TUR'], ['in PaH']],
+  ['out TUR / out PaH', ['out TUR'], ['out PaH']], ['wtu TUR / wtu PaH', ['wtu TUR'], ['wtu PaH']], ['OTP DATE', ['OTP DATE']], ['계약 STATUS', ['계약 STATUS']],
+  ['수주번호', ['수주번호']], ['REMARK', ['REMARK']]];
+let INFO_OFF = {};
+function infoRows(v) {
+  return (v._t === 'BWTS' ? INFO_B : INFO_S).map(([lb, a1, a2]) => {
+    let val = v.get(...a1); if (a2) { const b = v.get(...a2); val = val && b ? `${val} / ${b}` : (val || b); }
+    return [lb, val];
+  }).filter(x => x[1]);
+}
+function info(v) {
+  const TD = 'border:1px solid #9aa5b5;padding:3px 8px;vertical-align:top;' + F_KO, TH = TD + 'background-color:#eef2f7;font-weight:700;white-space:nowrap;';
+  const rows = infoRows(v).filter(x => !INFO_OFF[x[0]]);
+  return {subject: `[${v.ship}] ${v._t} 선박 정보`,
+    html: `<div style="${F_KO}"><table style="border-collapse:collapse;">` + rows.map(([l, x]) => `<tr><td style="${TH}">${esc(l)}</td><td style="${TD}">${esc(x)}</td></tr>`).join('') + '</table></div>'};
+}
+
+// ── 화면 ──
+const TABS = [['renew_en', '재계약 알림 (영문)'], ['renew_ko', '재계약 알림 (한글)'], ['notice', '수주 알림'], ['info', '선박 정보 표']];
+function pick(v) { CUR = v; onInit(v); INFO_OFF = {}; render(); }
+function render() {
+  const v = CUR; if (!v) return;
+  $('ship').innerHTML = `<h2>${esc(v.ship)}<span class="tag ${v._t === 'BWTS' ? 'b' : 's'}">${v._t}</span></h2>
+    <div class="sub">${esc([v.hull && '프로젝트 ' + v.hull, v.imo && 'IMO ' + v.imo, v.owner, v.country].filter(Boolean).join(' · '))}</div>
+    <div class="tabs">${TABS.map(([k, l]) => `<button data-k="${k}" class="${k === TAB ? 'on' : ''}">${l}</button>`).join('')}</div>
+    <div class="grid"><div class="form" id="frm"></div>
+      <div><div class="pv-h"><b>미리보기</b><button class="btn gray" id="cpS">제목 복사</button><button class="btn" id="cpB">본문 복사</button></div>
+        <div class="subj" id="pvS"></div><div id="pv"></div>
+        <div class="note">[본문 복사] → 아웃룩 전달·새 메일 창 본문에 Ctrl+V (표·글꼴 그대로). 서명은 아웃룩 설정대로 붙습니다.</div></div></div>`;
+  $('ship').querySelectorAll('.tabs button').forEach(b => b.onclick = () => { TAB = b.dataset.k; render(); });
+  $('cpS').onclick = () => copyText($('pvS').textContent, '제목을 복사했습니다');
+  $('cpB').onclick = copyBody;
+  form(); preview();
+}
+function form() {
+  const f = $('frm');
+  if (TAB === 'renew_en' || TAB === 'renew_ko') {
+    const L = lastService(CUR);
+    f.innerHTML = `<label>시트에서 가져온 값</label><div class="note" style="margin:0">마지막 서비스 ${esc(L.last)} → 다음 ${esc(L.next)} · SPEC ${esc(CUR.get('SPEC (DESIGN)') || CUR.get('SYSTEM') || '-')}</div>
+      <label>${TAB === 'renew_en' ? '내 영문 이름' : '내 한글 이름'}</label><input id="fMe" value="${esc(TAB === 'renew_en' ? CFG.en : CFG.ko)}">
+      <div class="note">이름은 ⚙ 설정에 저장됩니다. 날짜가 틀리면 구글시트의 실행일자를 고치고 [새로고침]하세요.</div>`;
+    $('fMe').oninput = e => { CFG[TAB === 'renew_en' ? 'en' : 'ko'] = e.target.value; saveCfg(); preview(); };
+  } else if (TAB === 'notice') {
+    const d = ON;
+    f.innerHTML = `<div class="row2"><div><label>1. 수주번호</label><input data-f="order_no" value="${esc(d.order_no)}" placeholder="H2026…"></div>
+        <div><label>8. PO</label><input data-f="po" value="${esc(d.po)}"></div></div>
+      <label>2. 고객사</label><input data-f="customer" value="${esc(d.customer)}">
+      <label>3. 선명</label><input data-f="ship_line" value="${esc(d.ship_line)}">
+      <label>4. 서비스사항</label><select id="fSvc">${SVC_OPTS.map(o => `<option${o === d.svc ? ' selected' : ''}>${esc(o)}</option>`).join('')}</select>
+      <textarea data-f="service_text" style="margin-top:5px">${esc(d.service_text)}</textarea>
+      <label>센서 (수량 0·빈칸은 메일에서 빠짐)</label><div id="fSens"></div><button class="mini" id="fAdd">+ 센서 추가</button>
+      <label>5. 본선스케줄</label><textarea data-f="schedule">${esc(d.schedule)}</textarea>
+      <label>6. 대리점정보</label><textarea data-f="agency">${esc(d.agency)}</textarea>
+      <label>7. 특이사항</label><textarea data-f="remark">${esc(d.remark)}</textarea>
+      <label>9. BILLING ADDRESS</label><textarea data-f="billing">${esc(d.billing)}</textarea>
+      <label>발신 (영업 담당자)</label><input data-f="sales" value="${esc(d.sales)}">
+      <label>받는 사람</label><div style="display:flex;gap:6px"><input id="fTo" value="${esc(CFG.to)}" placeholder="⚙ 설정에 저장"><button class="mini" id="cpTo">복사</button></div>`;
+    f.querySelectorAll('[data-f]').forEach(el => el.oninput = () => { ON[el.dataset.f] = el.value; preview(); });
+    $('fSvc').onchange = e => { ON.svc = e.target.value; ON.service_text = svcText(ON.equip, ON.svc); form(); preview(); };
+    $('fTo').oninput = e => { CFG.to = e.target.value; saveCfg(); };
+    $('cpTo').onclick = () => CFG.to ? copyText(CFG.to, '받는 사람을 복사했습니다') : toast('받는 사람이 비어 있습니다');
+    const sens = () => {
+      $('fSens').innerHTML = ON.sensors.map((r, i) => `<div class="sens"><input data-i="${i}" data-k="0" value="${esc(r[0])}"><input data-i="${i}" data-k="1" value="${esc(r[1])}"><button data-x="${i}" title="빼기">✕</button></div>`).join('');
+      $('fSens').querySelectorAll('input').forEach(el => el.oninput = () => { ON.sensors[+el.dataset.i][+el.dataset.k] = el.value; preview(); });
+      $('fSens').querySelectorAll('[data-x]').forEach(b => b.onclick = () => { ON.sensors.splice(+b.dataset.x, 1); sens(); preview(); });
+    };
+    sens();
+    $('fAdd').onclick = () => { ON.sensors.push(['', '']); sens(); };
+  } else {
+    f.innerHTML = `<label>넣을 항목 (시트에 값이 있는 것만)</label><div class="chk">${infoRows(CUR).map(([l]) =>
+      `<label><input type="checkbox" data-l="${esc(l)}"${INFO_OFF[l] ? '' : ' checked'}>${esc(l)}</label>`).join('')}</div>
+      <div class="note">아웃룩에서 메일 [전달]을 누른 뒤 본문 맨 위에 붙여 넣으면 됩니다.</div>`;
+    f.querySelectorAll('input[type=checkbox]').forEach(c => c.onchange = () => { INFO_OFF[c.dataset.l] = !c.checked; preview(); });
+  }
+}
+function built() { return TAB === 'renew_en' ? renewEN(CUR) : TAB === 'renew_ko' ? renewKO(CUR) : TAB === 'notice' ? notice(CUR) : info(CUR); }
+function preview() { const m = built(); $('pvS').textContent = m.subject; $('pv').innerHTML = m.html; }
+
+// ── 복사 (서식 유지) ──
+async function copyText(t, msg) {
+  try { await navigator.clipboard.writeText(t); }
+  catch (e) { const ta = document.createElement('textarea'); ta.value = t; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
+  toast(msg);
+}
+async function copyBody() {
+  const m = built();
+  try {
+    await navigator.clipboard.write([new ClipboardItem({'text/html': new Blob([m.html], {type: 'text/html'}),
+      'text/plain': new Blob([$('pv').innerText], {type: 'text/plain'})})]);
+  } catch (e) {                                   // 클립보드 API 가 막히면 화면의 미리보기를 선택해서 복사
+    const r = document.createRange(); r.selectNodeContents($('pv'));
+    const s = getSelection(); s.removeAllRanges(); s.addRange(r); document.execCommand('copy'); s.removeAllRanges();
+  }
+  toast('본문을 복사했습니다 — 아웃룩 본문에 Ctrl+V');
+}
+
+// ── 설정 ──
+$('setBtn').onclick = () => { const s = $('set'); s.style.display = s.style.display === 'block' ? 'none' : 'block';
+  $('sPub').value = CFG.pub; $('sGidB').value = CFG.gidB; $('sGidS').value = CFG.gidS; $('sEn').value = CFG.en; $('sKo').value = CFG.ko; $('sTo').value = CFG.to; };
+$('setClose').onclick = () => $('set').style.display = 'none';
+$('setSave').onclick = () => {
+  const pub = ($('sPub').value.trim().match(/^https:\/\/docs\.google\.com\/spreadsheets\/d\/e\/[A-Za-z0-9_-]+\/pub/) || [''])[0];
+  if (!pub) { toast('웹게시 주소 형식이 아닙니다 (…/pub)'); return; }
+  Object.assign(CFG, {pub, gidB: $('sGidB').value.trim(), gidS: $('sGidS').value.trim(), en: $('sEn').value.trim(), ko: $('sKo').value.trim(), to: $('sTo').value.trim()});
+  saveCfg(); $('set').style.display = 'none'; toast('저장했습니다'); load(); if (CUR) render();
+};
+
+let qt = null;
+$('q').oninput = () => { clearTimeout(qt); qt = setTimeout(search, 200); };
+$('q').onkeydown = e => { if (e.key === 'Enter') search(); };
+$('find').onclick = search;
+$('reload').onclick = load;
+load();
+$('q').focus();
+</script>
+</body>
+</html>
