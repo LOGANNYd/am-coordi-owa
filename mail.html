@@ -400,7 +400,26 @@ function render() {
     <div class="note">[본문 복사] → 아웃룩 전달·새 메일 본문에 Ctrl+V (표·글꼴 그대로). 서명은 아웃룩 설정대로 붙습니다.</div>`;
   $('cpS').onclick = () => copyText($('pvS').textContent, '제목을 복사했습니다');
   $('cpB').onclick = () => copyHtml(built().html);
+  if (TAB === 'notice' && v._t === 'BWTS') {          // 앱 수주 알림의 [GOOGLE SHEET] 와 같은 한 줄 (BWTS 전용시트)
+    $('cpS').insertAdjacentHTML('beforebegin', '<button class="btn gray sm" id="cpG" title="BWTS 전용시트에 붙일 한 줄 (선명·PROJECT·IMO·고객사·PO·수주번호·센서·PT미터)">GOOGLE SHEET</button>');
+    $('cpG').onclick = () => copyText(sheetLine(v), '시트 한 줄을 복사했습니다 — 구글시트 첫 칸을 누르고 Ctrl+V');
+  }
   form(); preview();
+}
+// 열 순서(앱과 같음): 선명 / PROJECT / IMO / 고객사 / PO / 수주번호 / PT / TT(EX) / TT / UVI / (빈칸) / PT 미터
+//   센서 수량은 수주 알림 창에서 고친 값이 먼저, 없으면 시트 값
+function sheetLine(v) {
+  const c = {};
+  ON.sensors.forEach(([lb, q]) => {
+    const n = (String(q).match(/\d+(\.\d+)?/) || [''])[0], L = String(lb).toUpperCase().replace(/\s+/g, '');
+    const k = L.startsWith('PT') ? 'pt' : L.startsWith('TT(EX)') ? 'ttex' : L === 'TT' ? 'tt' : L.startsWith('UVI') ? 'uvi' : '';
+    if (k && n) c[k] = n;
+  });
+  let mtr = v.get('MTR (PT)', 'MTR(PT)').trim();
+  if (mtr && /^[\d.]+$/.test(mtr)) mtr += 'M';
+  return [v.ship, v.hull, v.imo, v.owner, ON.po, ON.order_no,
+          c.pt || v.get('PT'), c.ttex || v.get('TT (EX)'), c.tt || v.get('TT'), c.uvi || v.get('UVI'), '', mtr]
+    .map(x => String(x || '').replace(/[\t\r\n]+/g, ' ').trim()).join('\t');
 }
 function form() {
   const f = $('frm');
