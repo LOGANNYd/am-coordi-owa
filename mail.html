@@ -263,12 +263,24 @@ function renderInfo() {
     return `<tr><td class="k">${esc(lb)}</td><td class="v">${cell}</td></tr>`;
   }).join('');
   $('body').innerHTML = `<table class="it">${rows}</table>
-    <div class="pv-h" style="margin-top:10px"><b>메일에 붙일 표</b><button class="btn gray sm" id="cpS">제목 복사</button><button class="btn sm" id="cpB">본문 복사</button></div>
-    <div class="note" style="margin-top:0">[본문 복사] → 아웃룩 전달·새 메일 본문에 Ctrl+V (위 정보가 표로 들어갑니다)</div>`;
+    <div class="pv-h" style="margin-top:10px"><b>견적 파일명</b><span class="note" style="margin:0">오늘 날짜로 · 저장 창 파일 이름에 Ctrl+V</span></div>
+    <div style="display:flex;gap:6px">${QUOTE_KINDS.map(k => `<button class="btn sm" style="flex:1" data-qk="${k}" title="${esc(quoteName(v, k))}">${k} 복사</button>`).join('')}</div>`;
   $('body').querySelectorAll('[data-dwg]').forEach(b => b.onclick = () => copyDwg(b.dataset.dwg));
   $('body').querySelectorAll('[data-f]').forEach(b => b.onclick = () => feEdit(b));
-  $('cpS').onclick = () => copyText(infoMail(v).subject, '제목을 복사했습니다');
-  $('cpB').onclick = () => copyHtml(infoMail(v).html);
+  $('body').querySelectorAll('[data-qk]').forEach(b => b.onclick = () => {
+    const name = quoteName(v, b.dataset.qk);                     // 누르는 순간의 오늘 날짜 (자정 넘겨 켜 둔 경우도)
+    copyText(name, '파일명을 복사했습니다 — ' + name);
+  });
+}
+
+// ── 견적 파일명 — 앱(erp_quote.file_name)과 같은 규칙: [QUOTE] 선명_BWTS MRO[ 종류]_YYYYMMDD ──
+//   MRO 는 꼬리 없음, REFURB·CALIBRATION 은 'BWTS MRO REFURB' 처럼. SCRUBBER 탭 배면 'SCRUBBER MRO'.
+//   확장자(.pdf)는 붙이지 않는다 — 저장 창이 알아서 붙인다.
+const QUOTE_KINDS = ['MRO', 'REFURB', 'CALIBRATION'];
+function quoteName(v, kind) {
+  const d = new Date(), ymd = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+  const ship = String(v.ship || 'SHIP').replace(/[\\/:*?"<>|]/g, '_').trim();
+  return `[QUOTE] ${ship}_${v._t === 'BWTS' ? 'BWTS' : 'SCRUBBER'} MRO${kind === 'MRO' ? '' : ' ' + kind}_${ymd}`;
 }
 
 // ── 선주사·국가 [수정] — 시트에 있는 이름을 추천, 저장하면 시트에 바로 (같은 배의 다른 탭도) ──
