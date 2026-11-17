@@ -62,6 +62,22 @@ header{position:sticky;top:0;z-index:5;background:var(--bg);padding:10px 0 8px;d
 .note{color:var(--mut);font-size:11px;margin-top:5px}
 .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#1f2937;color:#fff;padding:7px 14px;border-radius:8px;font-size:12.5px;z-index:99;display:none;max-width:90vw}
 #set{display:none}
+/* 행 편집 창 */
+.ov{position:fixed;inset:0;background:rgba(15,23,42,.38);z-index:50;display:flex;align-items:flex-start;justify-content:center;padding:24px 12px}
+.ov .win{background:#fff;border-radius:12px;width:100%;max-width:500px;max-height:calc(100vh - 48px);display:flex;flex-direction:column;box-shadow:0 12px 40px rgba(0,0,0,.22)}
+.ov .wh{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line)}
+.ov .wh b{flex:1;font-size:14px}
+.ov .wb{overflow:auto;padding:4px 14px 10px}
+.ov .wf{display:flex;gap:6px;justify-content:flex-end;padding:10px 14px;border-top:1px solid var(--line)}
+.ed-g{font-size:11.5px;font-weight:800;color:#2b6cb0;background:#f5f7fb;margin:10px -14px 4px;padding:4px 14px}
+.ed-r{display:grid;grid-template-columns:118px 1fr;gap:6px;align-items:center;padding:2px 0}
+.ed-r label{font-size:11.5px;color:var(--k);word-break:break-all}
+.ed-r input[type=text],.ed-r textarea{width:100%;border:1px solid #cdd3de;border-radius:6px;padding:4px 7px;font:inherit;font-size:12.5px}
+.ed-r textarea{min-height:40px;resize:vertical}
+.ed-r input.chg,.ed-r textarea.chg{border-color:#f59e0b;background:#fffbeb}
+.ed-r input[type=checkbox]{width:18px;height:18px;justify-self:start}
+details.ed-more summary{cursor:pointer;color:var(--mut);font-size:12px;margin-top:10px}
+.sv-l{font-size:12px;margin:2px 0}.sv-l s{color:#9aa3b2}
 #set .form label:first-child{margin-top:0}
 </style>
 </head>
@@ -262,9 +278,14 @@ function renderInfo() {
     if (kind === 'dwg' && val) cell += `<button class="fe" data-dwg="${esc(val)}" title="도면 폴더 주소를 복사">도면 주소 복사</button>`;
     return `<tr><td class="k">${esc(lb)}</td><td class="v">${cell}</td></tr>`;
   }).join('');
-  $('body').innerHTML = `<table class="it">${rows}</table>
+  $('body').innerHTML = `<div style="display:flex;justify-content:flex-end;margin:6px 0 2px"><button class="btn gray sm" id="rowEd">행 편집</button></div>
+    <table class="it">${rows}</table>
     <div class="pv-h" style="margin-top:10px"><b>견적 파일명</b><span class="note" style="margin:0">오늘 날짜로 · 저장 창 파일 이름에 Ctrl+V</span></div>
-    <div style="display:flex;gap:6px">${QUOTE_KINDS.map(k => `<button class="btn sm" style="flex:1" data-qk="${k}" title="${esc(quoteName(v, k))}">${k} 복사</button>`).join('')}</div>`;
+    <div style="display:flex;gap:6px">${QUOTE_KINDS.map(k => `<button class="btn sm" style="flex:1" data-qk="${k}" title="${esc(quoteName(v, k))}">${k} 복사</button>`).join('')}</div>
+    <div class="pv-h" style="margin-top:10px"><b>호선 폴더명</b><span class="note" style="margin:0">새 폴더 이름에 Ctrl+V</span></div>
+    <button class="btn sm" style="width:100%" id="cpF" title="${esc(folderName(v))}">폴더명 복사</button>`;
+  $('cpF').onclick = () => copyText(folderName(v), '폴더명을 복사했습니다 — ' + folderName(v));
+  $('rowEd').onclick = () => rowEdit(v);
   $('body').querySelectorAll('[data-dwg]').forEach(b => b.onclick = () => copyDwg(b.dataset.dwg));
   $('body').querySelectorAll('[data-f]').forEach(b => b.onclick = () => feEdit(b));
   $('body').querySelectorAll('[data-qk]').forEach(b => b.onclick = () => {
@@ -277,6 +298,15 @@ function renderInfo() {
 //   MRO 는 꼬리 없음, REFURB·CALIBRATION 은 'BWTS MRO REFURB' 처럼. SCRUBBER 탭 배면 'SCRUBBER MRO'.
 //   확장자(.pdf)는 붙이지 않는다 — 저장 창이 알아서 붙인다.
 const QUOTE_KINDS = ['MRO', 'REFURB', 'CALIBRATION'];
+// 호선 폴더명 — 앱(erp_quote._ship_folder_name)과 같다: 선명 (프로젝트)_IMO  (프로젝트·IMO 가 없으면 그 부분만 뺀다)
+const safeName = s => String(s || '').replace(/[\\/:*?"<>|]/g, '_').trim();
+function folderName(v) {
+  let nm = safeName(v.ship) || 'SHIP';
+  if (v.hull) nm += ` (${safeName(v.hull)})`;
+  const imo = String(v.imo || '').replace(/\D/g, '');
+  if (imo.length === 7) nm += '_' + imo;
+  return nm;
+}
 function quoteName(v, kind) {
   const d = new Date(), ymd = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
   const ship = String(v.ship || 'SHIP').replace(/[\\/:*?"<>|]/g, '_').trim();
@@ -323,6 +353,86 @@ function feEdit(btn) {
     const bad = res.slice(1).filter(r => !r[1].ok);
     toast(`✅ ${f === 'owner' ? '선주사' : '국가'} 저장 — ${val}` + (res.length > 1 ? (bad.length ? ` (다른 탭 ${bad.length}곳 실패)` : ` (${res[1][0]._t} 탭도 같이)`) : ''));
     render();
+  };
+}
+
+// ── 행 편집 (2026-11-18) — 시트 행 전체를 창에서 고쳐 한 번에 저장. 묶음·순서는 앱(sales_ledger.EDIT_LAYOUT)과 같다 ──
+const EDIT_LAYOUT = [
+  ['선박정보', ['SHIP NAME', '프로젝트', 'IMO']],
+  ['선주사 정보', ['SHIP OWNER', '국가']],
+  ['BWTS 정보', ['SPEC (DESIGN)', 'PT', 'MTR (PT)', 'TT (EX)', 'TT', 'UVI', 'FMU', 'UV LAMP', 'DRAW NO', '설계 담당자']],
+  ['SCRUBBER 정보', ['SYSTEM', 'in TUR', 'in PaH', 'out TUR', 'out PaH', 'wtu TUR', 'wtu PaH', 'TUR', 'PaH', 'OTP DATE']],
+  ['수주현황', ['2025 견적', '2025 수주', '2025 실행일자', '2025 수주 금액', '2025 실비금액', '2026 견적', '2026 수주', '2026 실행일자',
+    '2026 수주금액', '2026 실비금액', '2026 총수주액', '2026 SERVICE 형태', '2025년 수주', '2026년 견적', '2026년 수주', '계약 STATUS', 'REMARK']]];
+// 머리글 → [[묶음, [열…]]…, ['기타', [나머지 열]]]. ★'2026 수주'가 '2026 수주금액'을 먼저 가져가지 않게 정확일치부터
+function editLayout(header) {
+  const H = header.map(hn), used = new Set(), out = [];
+  for (const [g, al] of EDIT_LAYOUT) {
+    const items = [];
+    for (const a of al) {
+      const A = hn(a);
+      let c = H.map((h, i) => i).filter(i => !used.has(i) && H[i] === A);
+      if (!c.length) c = H.map((h, i) => i).filter(i => !used.has(i) && H[i].startsWith(A)).sort((x, y) => H[x].length - H[y].length);
+      if (!c.length) c = H.map((h, i) => i).filter(i => !used.has(i) && H[i].includes(A)).sort((x, y) => H[x].length - H[y].length);
+      if (c.length) { used.add(c[0]); items.push(c[0]); }
+    }
+    if (items.length) out.push([g, items]);
+  }
+  const rest = header.map((h, i) => i).filter(i => !used.has(i) && String(header[i] || '').trim());
+  if (rest.length) out.push(['기타', rest]);
+  return out;
+}
+function closeOv() { const o = document.querySelector('.ov'); if (o) o.remove(); }
+function rowEdit(v) {
+  if (!useGas()) { toast('행 편집은 Apps Script 로 연결했을 때만 됩니다 (⚙ 설정)'); return; }
+  closeOv();
+  // 체크박스 칸: 값이 TRUE/FALSE 이거나, 'YYYY 견적'·'YYYY 수주'·'YYYY년 수주' 열(빈칸이어도 — 빈칸 = 해제)
+  const isChk = c => /^(TRUE|FALSE)$/i.test(String(v._r[c] || '').trim()) || /^20\d\d년?(견적|수주)$/.test(hn(v._h[c]));
+  const field = c => {
+    const h = String(v._h[c] || '').replace(/\s+/g, ' ').trim(), val = String(v._r[c] || '');
+    const inp = isChk(c) ?`<input type="checkbox" data-c="${c}"${/^TRUE$/i.test(val) ? ' checked' : ''}>`
+      : (/REMARK|SPEC|특이|메모/i.test(h) ? `<textarea data-c="${c}">${esc(val)}</textarea>` : `<input type="text" data-c="${c}" value="${esc(val)}">`);
+    return `<div class="ed-r"><label title="${esc(v._h[c])}">${esc(h)}</label>${inp}</div>`;
+  };
+  const L = editLayout(v._h);
+  const main = L.filter(g => g[0] !== '기타').map(([g, cs]) => `<div class="ed-g">${esc(g)}</div>` + cs.map(field).join('')).join('');
+  const more = L.filter(g => g[0] === '기타').map(([, cs]) => `<details class="ed-more"><summary>기타 열 ${cs.length}개</summary>${cs.map(field).join('')}</details>`).join('');
+  document.body.insertAdjacentHTML('beforeend', `<div class="ov"><div class="win">
+    <div class="wh"><b>행 편집 · ${esc(v.ship)} <span class="tag ${v._t === 'BWTS' ? 'b' : 's'}">${v._t}</span></b><button class="btn gray sm" data-x>✕</button></div>
+    <div class="wb">${main}${more}</div>
+    <div class="wf"><span class="note" id="edMsg" style="flex:1;margin:0">바꾼 칸은 노랗게 표시됩니다</span><button class="btn gray" data-x>취소</button><button class="btn" id="edSave">저장</button></div></div></div>`);
+  const ov = document.querySelector('.ov');
+  ov.querySelectorAll('[data-x]').forEach(b => b.onclick = closeOv);
+  const now = el => el.type === 'checkbox' ? (el.checked ? 'TRUE' : 'FALSE') : el.value.trim();
+  const orig = el => { const s = String(v._r[+el.dataset.c] || '').trim(); return el.type === 'checkbox' ? (/^TRUE$/i.test(s) ? 'TRUE' : 'FALSE') : s; };
+  ov.querySelectorAll('[data-c]').forEach(el => el.oninput = el.onchange = () => el.classList.toggle('chg', now(el) !== orig(el)));
+  $('edSave').onclick = async () => {
+    const fields = {}, lines = [];
+    ov.querySelectorAll('[data-c]').forEach(el => { if (now(el) !== orig(el)) { const c = +el.dataset.c; fields[v._h[c]] = now(el); lines.push([v._h[c], orig(el), now(el), c]); } });
+    if (!lines.length) { $('edMsg').textContent = '바뀐 칸이 없습니다'; return; }
+    $('edSave').disabled = true; $('edMsg').textContent = '시트에 저장 중…';
+    const keys = {order: v.order, imo: v.imo, ship: v.ship};
+    let j; try { j = await gasPost({tab: v._t, keys, fields}); } catch (e) { j = {ok: false, error: String(e)}; }
+    if (!j || !j.ok) { $('edSave').disabled = false; $('edMsg').textContent = '저장 실패 — ' + ((j && j.error) || ''); $('edMsg').style.color = '#c2410c'; return; }
+    lines.forEach(([, , n, c]) => v._r[c] = n); fill(v);
+    closeOv(); render();
+    savedModal(v, lines, j.before || {});
+  };
+}
+// 저장 확인 — [확인] 닫기 · [되돌리기] 바꾸기 전 값으로 다시 저장
+function savedModal(v, lines, before) {
+  document.body.insertAdjacentHTML('beforeend', `<div class="ov"><div class="win" style="max-width:420px">
+    <div class="wh"><b>✅ 저장하였습니다</b></div>
+    <div class="wb" style="padding-top:8px">${lines.map(([h, o, n]) => `<div class="sv-l"><b>${esc(String(h).replace(/\s+/g, ' '))}</b> : <s>${esc(o) || '(빈칸)'}</s> → ${esc(n) || '(빈칸)'}</div>`).join('')}</div>
+    <div class="wf"><button class="btn gray" id="svUndo">되돌리기</button><button class="btn" id="svOk">확인</button></div></div></div>`);
+  $('svOk').onclick = closeOv;
+  $('svUndo').onclick = async () => {
+    const fields = {}; lines.forEach(([h, o]) => fields[h] = (h in before) ? before[h] : o);
+    $('svUndo').disabled = true;
+    let j; try { j = await gasPost({tab: v._t, keys: {order: v.order, imo: v.imo, ship: v.ship}, fields}); } catch (e) { j = {ok: false, error: String(e)}; }
+    if (!j || !j.ok) { $('svUndo').disabled = false; toast('되돌리기 실패 — ' + ((j && j.error) || '')); return; }
+    lines.forEach(([h, o, , c]) => v._r[c] = (h in before) ? before[h] : o); fill(v);
+    closeOv(); render(); toast('↩ 되돌렸습니다');
   };
 }
 
